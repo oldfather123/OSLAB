@@ -19,7 +19,10 @@ void test_printf_edge_cases() {
 }
 
 void main() {
+    //Lab1
     //uart_puts("Hello OS");
+
+    //Lab2
     test_printf_basic();
     test_printf_edge_cases();
 }
