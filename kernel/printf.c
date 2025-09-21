@@ -33,6 +33,19 @@ void print_number(int num, int base, int sign) {
     }
 }
 
+void print_ptr(unsigned long x) {
+    int i;
+    console_putc('0');
+    console_putc('x');
+    for (i = (sizeof(unsigned long) * 2) - 1; i >= 0; i--) {
+        unsigned long digit = (x >> (i * 4)) & 0xF;
+        if (digit < 10)
+            console_putc('0' + digit);
+        else
+            console_putc('a' + (digit - 10));
+    }
+}
+
 int printf(const char *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -71,6 +84,11 @@ int printf(const char *fmt, ...) {
                 console_putc(c);
                 break;
             }
+            // 指针
+            case 'p': {
+                print_ptr(va_arg(ap, unsigned long));
+                break;
+            }
             // '%'
             case '%': { 
                 console_putc('%');
@@ -88,4 +106,11 @@ int printf(const char *fmt, ...) {
 
     va_end(ap);
     return 0;
+}
+
+void panic(char *s) {
+    console_puts("panic: ");
+    console_puts(s);
+    console_putc('\n');
+    while (1);
 }

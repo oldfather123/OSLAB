@@ -1,7 +1,9 @@
 #include "def.h"
+#include "assert.h"
 
 __attribute__ ((aligned (16))) char stack_top[4096];
 
+// Lab2
 void test_printf_basic() {
     printf("Testing integer: %d\n", 42);
     printf("Testing negative: %d\n", -123);
@@ -18,11 +20,32 @@ void test_printf_edge_cases() {
     printf("Empty string: %s\n", "");
 }
 
-void main() {
-    //Lab1
-    //uart_puts("Hello OS");
+// Lab3
+void test_physical_memory(void) { 
+    void *page1 = alloc_page(); 
+    void *page2 = alloc_page(); 
+    assert(page1 != page2); 
+    assert(((unsigned long)page1 & 0xFFF) == 0);  // 页对齐检查
 
-    //Lab2
-    test_printf_basic();
-    test_printf_edge_cases();
+    *(int*)page1 = 0x12345678; 
+    assert(*(int*)page1 == 0x12345678); 
+
+    free_page(page1); 
+    void *page3 = alloc_page(); 
+    free_page(page2); 
+    free_page(page2);
+    free_page(page3); 
+}
+
+void main() {
+    // Lab1
+    // uart_puts("Hello OS");
+
+    // Lab2
+    // test_printf_basic();
+    // test_printf_edge_cases();
+
+    // Lab3
+    pmm_init();
+    test_physical_memory();
 }
