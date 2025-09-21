@@ -1,6 +1,5 @@
 #include "def.h"
 
-#define UART0 0x10000000L
 #define THR   0x00          // 发送寄存器偏移
 #define LSR   0x05          // 线路状态寄存器偏移
 #define LSR_TX_IDLE (1<<5)  // LSR的第5位，发送缓冲区空

@@ -11,7 +11,7 @@ CFLAGS = -Wall -O2 -ffreestanding -nostdlib -nostartfiles -mcmodel=medany
 LDFLAGS = -T kernel.ld
 
 # 目标文件
-OBJS = entry.o uart.o console.o printf.o start.o spinlock.o kalloc.o string.o
+OBJS = entry.o uart.o console.o printf.o start.o spinlock.o kalloc.o string.o vm.o
 
 # 最终生成的内核文件
 KERNEL = kernel.elf

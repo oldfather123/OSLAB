@@ -1,5 +1,6 @@
 #include "def.h"
 #include "assert.h"
+#include "riscv.h"
 
 __attribute__ ((aligned (16))) char stack_top[4096];
 
@@ -36,6 +37,41 @@ void test_physical_memory(void) {
     free_page(page2);
     free_page(page3); 
 }
+void test_pagetable(void) {
+    pagetable_t pt = create_pagetable(); 
+    
+    unsigned long va = 0x1000000; 
+    unsigned long pa = (unsigned long)alloc_page(); 
+    assert(map_page(pt, va, pa, PGSIZE, PTE_R | PTE_W) == 0); 
+    
+    pte_t *pte = walk_lookup(pt, va); 
+    assert(pte != 0 && (*pte & PTE_V));
+    assert(PTE2PA(*pte) == pa); 
+    
+    assert(*pte & PTE_R); 
+    assert(*pte & PTE_W); 
+    assert(!(*pte & PTE_X)); 
+}
+void test_virtual_memory(void) {
+    printf("Before enabling paging...\n");
+
+    // 启用分页
+    kvminit();
+    kvminithart();
+    printf("After enabling paging...\n");
+    
+    // 测试内核代码仍然可执行
+    test_printf_basic();
+    printf("Code execution test passed.\n");
+    
+    // 测试内核数据仍然可访问
+    test_physical_memory();
+    printf("Data access test passed.\n");
+    
+    // 测试设备访问仍然正常
+    uart_puts("Hello OS\n");
+    printf("Device access test passed.\n");
+}
 
 void main() {
     // Lab1
@@ -47,5 +83,7 @@ void main() {
 
     // Lab3
     pmm_init();
-    test_physical_memory();
+    // test_physical_memory();
+    // test_pagetable();
+    test_virtual_memory();
 }

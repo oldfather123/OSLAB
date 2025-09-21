@@ -1,9 +1,6 @@
 #include "riscv.h"
 #include "def.h"
 
-// 物理内存上限
-#define PHYSTOP (0x80000000L + 128 * 1024 * 1024)
-
 // kernel.ld定义的内核代码结束地址
 extern char end[];
 
