@@ -23,34 +23,45 @@ void test_printf_edge_cases() {
 
 // Lab3
 void test_physical_memory(void) { 
+    // 测试基本分配
     void *page1 = alloc_page(); 
     void *page2 = alloc_page(); 
     assert(page1 != page2); 
     assert(((unsigned long)page1 & 0xFFF) == 0);  // 页对齐检查
+    printf("Basic allocation test passed.\n");
 
+    // 测试数据写入
     *(int*)page1 = 0x12345678; 
     assert(*(int*)page1 == 0x12345678); 
+    printf("Data write&read test passed.\n");
 
+    // 测试释放和重新分配
     free_page(page1); 
     void *page3 = alloc_page(); 
     free_page(page2); 
-    free_page(page2);
     free_page(page3); 
+    printf("Free and reallocation test passed.\n");
 }
 void test_pagetable(void) {
     pagetable_t pt = create_pagetable(); 
     
+    // 测试基本映射
     unsigned long va = 0x1000000; 
     unsigned long pa = (unsigned long)alloc_page(); 
-    assert(map_page(pt, va, pa, PGSIZE, PTE_R | PTE_W) == 0); 
+    assert(map_page(pt, va, pa, PGSIZE, PTE_R | PTE_W) == 0);
+    printf("Basic mapping test passed.\n");
     
+    // 测试地址转换
     pte_t *pte = walk_lookup(pt, va); 
     assert(pte != 0 && (*pte & PTE_V));
     assert(PTE2PA(*pte) == pa); 
+    printf("Address translation test passed.\n");
     
+    // 测试权限位
     assert(*pte & PTE_R); 
     assert(*pte & PTE_W); 
     assert(!(*pte & PTE_X)); 
+    printf("Permission bits test passed.\n");
 }
 void test_virtual_memory(void) {
     printf("Before enabling paging...\n");
@@ -83,7 +94,7 @@ void main() {
 
     // Lab3
     pmm_init();
-    // test_physical_memory();
-    // test_pagetable();
+    test_physical_memory();
+    test_pagetable();
     test_virtual_memory();
 }
