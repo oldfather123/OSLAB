@@ -1,3 +1,7 @@
+// global definitions
+#define PGSIZE 4096
+#define NULL ((void *)0)
+
 // uart.c
 void uart_putc(char c);
 void uart_puts(char *s);

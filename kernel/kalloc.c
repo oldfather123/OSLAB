@@ -1,10 +1,8 @@
 #include "riscv.h"
 #include "def.h"
 
-#define PGSIZE 4096
 // 物理内存上限
 #define PHYSTOP (0x80000000L + 128 * 1024 * 1024)
-#define NULL ((void *)0)
 
 // kernel.ld定义的内核代码结束地址
 extern char end[];
@@ -64,7 +62,7 @@ void free_page(void *page) {
 	release(&pmm.lock);
 }
 
-// TODO
+// TODO：连续页面分配
 void *alloc_pages(int n) {
     struct run *r;
     void *start;
