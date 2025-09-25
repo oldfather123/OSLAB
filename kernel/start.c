@@ -91,6 +91,7 @@ void main() {
     // Lab2
     // test_printf_basic();
     // test_printf_edge_cases();
+    // clear_screen();
 
     // Lab3
     pmm_init();

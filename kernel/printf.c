@@ -114,3 +114,8 @@ void panic(char *s) {
     console_putc('\n');
     while (1);
 }
+
+void clear_screen(void) {
+    console_puts("\033[2J");    // 清除整个屏幕
+    console_puts("\033[H");     // 将光标移到左上角
+}

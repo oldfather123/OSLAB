@@ -18,6 +18,7 @@ void print_number(int num, int base, int sign);
 void print_ptr(unsigned long x);
 int printf(const char *fmt, ...);
 void panic(char*) __attribute__((noreturn));
+void clear_screen(void);
 
 // spinlock.c
 struct spinlock {
