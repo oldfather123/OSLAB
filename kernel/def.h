@@ -34,6 +34,7 @@ void pmm_init(void);
 void freerange(void *pa_start, void *pa_end);
 void *alloc_page(void);
 void free_page(void *page);
+void free_page_to_freelist(void *page);
 void *alloc_pages(int n);
 
 // string.c

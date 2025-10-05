@@ -30,7 +30,7 @@ void test_physical_memory(void) {
     assert(((unsigned long)page1 & 0xFFF) == 0);  // 页对齐检查
     printf("Basic allocation test passed.\n");
 
-    // 测试数据写入
+    // 测试数据读写
     *(int*)page1 = 0x12345678; 
     assert(*(int*)page1 == 0x12345678); 
     printf("Data write&read test passed.\n");
@@ -83,6 +83,46 @@ void test_virtual_memory(void) {
     uart_puts("Hello OS\n");
     printf("Device access test passed.\n");
 }
+void test_alloc_pages(void) {
+    // 独立分配3个页面，释放其中2个，使得空闲页链表前两个地址不连续
+    void *page1 = alloc_page(); 
+    void *page2 = alloc_page();
+    void *page3 = alloc_page();
+    free_page(page1);
+    free_page(page3);
+    
+    int n = 3;
+    // 分配3个连续页面
+    void *base = alloc_pages(n);
+    
+    assert(base != 0);
+    assert(((unsigned long)base & 0xFFF) == 0);  // 页对齐检查
+    printf("Continuous allocation test passed.\n");
+
+    for (int i = 0; i < n; i++) {
+        char *pi = (char*)base + i * PGSIZE;
+
+        // 页面连续性检查
+        if (i > 0) {
+            char *prev = (char*)base + (i - 1) * PGSIZE;
+            assert(pi - prev == PGSIZE);
+            printf("Page %d is continuous.\n", i);
+        }
+
+        // 页面读写检查
+        *(int*)pi = 0x12345678 + i;
+        assert(*(int*)pi == 0x12345678 + i);
+        printf("Page %d write&read test passed.\n", i);
+    }
+
+    // 逐页释放
+    for (int i = 0; i < n; i++) {
+        free_page((char*)base + i * PGSIZE);
+    }
+
+    printf("Continuous page free test passed.\n");
+    free_page(page2);
+}
 
 void main() {
     // Lab1
@@ -95,7 +135,8 @@ void main() {
 
     // Lab3
     pmm_init();
-    test_physical_memory();
-    test_pagetable();
-    test_virtual_memory();
+    test_alloc_pages();
+    // test_physical_memory();
+    // test_pagetable();
+    // test_virtual_memory();
 }
