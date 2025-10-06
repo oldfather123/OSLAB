@@ -124,6 +124,51 @@ void test_alloc_pages(void) {
     free_page(page2);
 }
 
+// Lab4
+volatile int interrupt_count = 0;
+void timer_interrupt(void) {
+    interrupt_count++;
+    printf("Timer interrupt triggered! Count: %d\n", interrupt_count);
+
+    // 设置下一次时钟中断
+    sbi_set_timer(get_time() + 1000000);
+}
+void test_timer_interrupt(void) { 
+    printf("Testing timer interrupt...\n"); 
+
+    // 注册时钟中断处理函数
+    register_interrupt(IRQ_TIMER, timer_interrupt);
+
+    // 先安排第一次时钟中断
+    unsigned long start_time = get_time();
+    sbi_set_timer(start_time + 1000000);  // 安排首次触发
+
+    // 开启时钟中断
+    enable_interrupt(IRQ_TIMER);
+
+    // 等待5次中断
+    while (interrupt_count < 5) { 
+        printf("Waiting for interrupt %d...\n", interrupt_count + 1); 
+        // 简单延时
+        for (volatile int i = 0; i < 10000000; i++);
+    } 
+ 
+    // 记录中断后的时间
+    unsigned long end_time = get_time();
+
+    // 打印测试结果
+    printf("Timer test completed:\n");
+    printf("Start time: %x\n", start_time);
+    printf("End time: %x\n", end_time);
+    printf("Total interrupts: %d\n", interrupt_count);
+
+    // 注销时钟中断处理函数
+    unregister_interrupt(IRQ_TIMER);
+
+    // 关闭时钟中断
+    disable_interrupt(IRQ_TIMER);
+}
+
 void main() {
     // Lab1
     // uart_puts("Hello OS");
@@ -134,9 +179,13 @@ void main() {
     // clear_screen();
 
     // Lab3
-    pmm_init();
-    test_alloc_pages();
+    // pmm_init();
+    // test_alloc_pages();
     // test_physical_memory();
     // test_pagetable();
     // test_virtual_memory();
+
+    // Lab4
+    trap_init();
+    test_timer_interrupt();
 }

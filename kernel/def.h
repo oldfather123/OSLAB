@@ -4,6 +4,7 @@
 #define UART0 0x10000000L
 #define KERNBASE 0x80000000L
 #define PHYSTOP (0x80000000L + 128 * 1024 * 1024)
+#define IRQ_TIMER 127
 
 // uart.c
 void uart_putc(char c);
@@ -51,3 +52,17 @@ pte_t* walk_lookup(pagetable_t pt, unsigned long va);
 void kvminit(void);
 void kvminithart(void);
 void map_region(pagetable_t kpgtbl, unsigned long va, unsigned long pa, unsigned long sz, int perm);
+
+// trap.c
+typedef void (*interrupt_handler_t)(void);
+void trap_init(void);
+void kerneltrap(void);
+void register_interrupt(int irq, interrupt_handler_t handler);
+void unregister_interrupt(int irq);
+void enable_interrupt(int irq);
+void disable_interrupt(int irq);
+void interrupt_dispatch(unsigned long scause);
+
+// sbi.c
+void sbi_set_timer(unsigned long time);
+unsigned long get_time(void);
