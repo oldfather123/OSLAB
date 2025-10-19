@@ -6,6 +6,8 @@
 // 中断向量表
 interrupt_handler_t interrupt_vector[MAX_INTERRUPTS];
 
+unsigned long prev_sepc = 0x80200000;
+
 void kernelvec();
 
 void trap_init(void) {
@@ -26,6 +28,9 @@ void kerneltrap(void) {
     unsigned long sepc = r_sepc();       
     unsigned long sstatus = r_sstatus(); 
     unsigned long scause = r_scause(); 
+    // printf("trap sepc: 0x%x\n", r_sepc());
+    // prev_sepc = sepc;
+    // printf("Prev sepc set to: 0x%x\n", prev_sepc);
 
     // 检查中断来自S模式
     if ((sstatus & SSTATUS_SPP) == 0) {
@@ -37,12 +42,29 @@ void kerneltrap(void) {
         panic("kerneltrap: interrupts enabled");
     }
 
-    // 调用中断分发函数
-    interrupt_dispatch(scause);
+    // 如果是异常（最高位为0），调用异常处理
+    if ((scause >> (8 * sizeof(unsigned long) - 1)) == 0) {
+        struct trapframe tf;
+        tf.sepc = sepc;
+        tf.sstatus = sstatus;
+        tf.stval = r_stval();
+        tf.scause = scause;
 
-    // 恢复中断前的CSR寄存器值
-    w_sepc(sepc);
-    w_sstatus(sstatus);
+        // 调用异常处理函数
+        handle_exception(&tf);
+
+        // 如果修改了中断寄存器内容，需要写回
+        w_sepc(tf.sepc);
+        w_sstatus(tf.sstatus);
+    } 
+    else {
+        // 调用中断分发函数
+        interrupt_dispatch(scause);
+
+        // 恢复中断前的CSR寄存器值
+        w_sepc(sepc);
+        w_sstatus(sstatus);
+    }
 }
 
 void register_interrupt(int irq, interrupt_handler_t handler) {
@@ -98,5 +120,75 @@ void interrupt_dispatch(unsigned long scause) {
     } 
     else {
         panic("Unexpected interrupt\n");
+    }
+}
+
+void dump_trapframe(struct trapframe *tf) {
+    printf("=== Trapframe Dump ===\n");
+    printf("sepc    : 0x%x\n", tf->sepc);
+    printf("sstatus : 0x%x\n", tf->sstatus);
+    printf("stval   : 0x%x\n", tf->stval);
+    printf("scause  : 0x%x\n", tf->scause);
+}
+
+void handle_illegal_instruction(struct trapframe *tf) {
+    printf("Exception: illegal instruction\n");
+    tf->sepc += 4;
+}
+
+void handle_syscall(struct trapframe *tf) {
+    printf("Exception: syscall\n");
+    tf->sepc += 4;
+}
+
+int cnt = 0;
+void handle_instruction_page_fault(struct trapframe *tf) {
+    printf("Exception: instruction page fault\n");
+    dump_trapframe(tf);
+    cnt++;
+    tf->sepc += 4;
+    if (cnt >= 5) {
+        panic("Too many instruction page faults");
+    }
+}
+
+void handle_load_page_fault(struct trapframe *tf) {
+    printf("Exception: load page fault\n");
+    tf->sepc += 4;
+}
+
+void handle_store_page_fault(struct trapframe *tf) {
+    printf("Exception: store page fault\n");
+    tf->sepc += 4;
+}
+
+// 异常处理函数
+void handle_exception(struct trapframe *tf) {
+    // 去掉中断位
+    unsigned long cause = r_scause() & (~(1UL << (8 * sizeof(unsigned long) - 1))); 
+    printf("scause: 0x%x\n", cause);
+    switch (cause) {
+    case 2:
+        // 非法指令
+        handle_illegal_instruction(tf);
+        break;
+    case 9:  
+        // 系统调用
+        handle_syscall(tf);
+        break;
+    case 12: 
+        // 指令页故障
+        handle_instruction_page_fault(tf);
+        break;
+    case 13: 
+        // 加载页故障
+        handle_load_page_fault(tf);
+        break;
+    case 15: 
+        // 存储页故障
+        handle_store_page_fault(tf);
+        break;
+    default:
+        panic("Unhandled exception");
     }
 }

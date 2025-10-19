@@ -55,6 +55,12 @@ void map_region(pagetable_t kpgtbl, unsigned long va, unsigned long pa, unsigned
 
 // trap.c
 typedef void (*interrupt_handler_t)(void);
+struct trapframe {
+    unsigned long sepc;
+    unsigned long sstatus;
+    unsigned long stval;
+    unsigned long scause;
+};
 void trap_init(void);
 void kerneltrap(void);
 void register_interrupt(int irq, interrupt_handler_t handler);
@@ -62,6 +68,12 @@ void unregister_interrupt(int irq);
 void enable_interrupt(int irq);
 void disable_interrupt(int irq);
 void interrupt_dispatch(unsigned long scause);
+void handle_division_by_zero(struct trapframe *tf);
+void handle_syscall(struct trapframe *tf);
+void handle_instruction_page_fault(struct trapframe *tf);
+void handle_load_page_fault(struct trapframe *tf);
+void handle_store_page_fault(struct trapframe *tf);
+void handle_exception(struct trapframe *tf);
 
 // sbi.c
 void sbi_set_timer(unsigned long time);

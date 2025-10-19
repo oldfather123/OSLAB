@@ -168,6 +168,53 @@ void test_timer_interrupt(void) {
     // 关闭时钟中断
     disable_interrupt(IRQ_TIMER);
 }
+void test_exception_handling(void) {
+    printf("Testing exception handling...\n");
+
+    // 非法指令异常
+    printf("Illegal Instruction Test\n");
+    asm volatile(".word 0xFFFFFFFF\n"
+                 "nop\n"              
+                 "nop\n"
+                 "nop\n");
+
+    // 系统调用异常
+    // printf("System Call Exception\n");
+    // asm volatile("ecall\n"
+    //              "nop\n"
+    //              "nop\n"
+    //              "nop\n");
+
+    // 指令页异常
+    // printf("Instruction Page Fault\n");
+    // volatile unsigned long *invalid_instr = (unsigned long *)0xFFFFFFFF00000000UL;
+    // volatile unsigned long *valid_instr = (unsigned long *)(r_sepc() + 4);
+    // printf ("Jumping to invalid instruction address: 0x%x\n", (unsigned long)invalid_instr>>32);
+    // printf("Current sepc: 0x%x\n", r_sepc());
+    // asm volatile(
+    //     "mv t0, %0\n\t"
+    //     "jalr x0, 0(t0)\n\t"
+    //     :
+    //     : "r"(valid_instr)
+    //     : "t0", "memory"
+    // );
+    // asm volatile("nop\nnop\nnop\n");
+
+    // 加载页异常
+    printf("Load Page Fault Test\n");
+    volatile unsigned long *bad_load = (unsigned long *)0xFFFFFFFF00000000UL;
+    unsigned long bad_value = *bad_load;
+    (void)bad_value;
+    asm volatile("nop\nnop\nnop\n");
+
+    // 存储页异常
+    printf("Store Page Fault Test\n");
+    volatile unsigned long *bad_store = (unsigned long *)0xFFFFFFFF00000000UL;
+    *bad_store = 0x42;
+    asm volatile("nop\nnop\nnop\n");
+
+    printf("Exception tests completed\n");
+}
 
 void main() {
     // Lab1
@@ -186,6 +233,10 @@ void main() {
     // test_virtual_memory();
 
     // Lab4
+    pmm_init();
+    kvminit();
+    kvminithart();
     trap_init();
     test_timer_interrupt();
+    test_exception_handling();
 }
