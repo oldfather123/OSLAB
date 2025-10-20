@@ -49,8 +49,8 @@ int map_page(pagetable_t pt, unsigned long va, unsigned long pa, unsigned long s
 void destroy_pagetable(pagetable_t pt);
 pte_t* walk_create(pagetable_t pt, unsigned long va);
 pte_t* walk_lookup(pagetable_t pt, unsigned long va);
-void kvminit(void);
-void kvminithart(void);
+void kvm_init(void);
+void kvm_inithart(void);
 void map_region(pagetable_t kpgtbl, unsigned long va, unsigned long pa, unsigned long sz, int perm);
 
 // trap.c

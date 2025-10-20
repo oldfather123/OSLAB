@@ -69,8 +69,8 @@ void test_virtual_memory(void) {
     printf("Before enabling paging...\n");
 
     // 启用分页
-    kvminit();
-    kvminithart();
+    kvm_init();
+    kvm_inithart();
     printf("After enabling paging...\n");
     
     // 测试内核代码仍然可执行
@@ -215,6 +215,11 @@ void test_exception_handling(void) {
 
     printf("Exception tests completed\n");
 }
+void pt_init(void) {
+    pmm_init();
+    kvm_init();
+    kvm_inithart();
+}
 
 void main() {
     // Lab1
@@ -233,9 +238,7 @@ void main() {
     // test_virtual_memory();
 
     // Lab4
-    pmm_init();
-    kvminit();
-    kvminithart();
+    pt_init();
     trap_init();
     test_timer_interrupt();
     test_exception_handling();

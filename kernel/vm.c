@@ -91,7 +91,7 @@ pte_t* walk_lookup(pagetable_t pt, unsigned long va) {
 
 pagetable_t kernel_pagetable;
 
-void kvminit(void) {
+void kvm_init(void) {
     kernel_pagetable = create_pagetable();
 
     // 映射内核代码段
@@ -108,7 +108,7 @@ void kvminit(void) {
  } 
  
 
-void kvminithart(void) { 
+void kvm_inithart(void) { 
     // 激活内核页表
     w_satp(MAKE_SATP(kernel_pagetable)); 
     sfence_vma(); 
