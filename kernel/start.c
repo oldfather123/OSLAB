@@ -221,6 +221,39 @@ void pt_init(void) {
     kvm_inithart();
 }
 
+// Lab5
+void simple_task(void) {
+    int a = 1;
+}
+void test_process_creation(void) {
+    printf("Testing process creation...\n");
+    
+    // 测试基本的进程创建
+    int pid = create_process(simple_task);
+    assert(pid > 0);
+    
+    // 测试进程表限制，应该创建64个
+    int pids[NPROC];
+    int count = 1;
+    for (int i = 0; i < NPROC + 5; i++) {
+        int pid = create_process(simple_task);
+        if (pid > 0) {
+            pids[count++] = pid;
+        } 
+        else {
+            break;
+        }  
+    }
+    printf("Created %d processes\n", count);
+    
+    // 清理测试进程
+    for (int i = 0; i < count; i++) {
+        wait_process(NULL);
+    }
+
+    printf("Process creation test completed\n");
+}
+
 void main() {
     // Lab1
     // uart_puts("Hello OS");
@@ -238,8 +271,11 @@ void main() {
     // test_virtual_memory();
 
     // Lab4
-    pt_init();
-    trap_init();
-    test_timer_interrupt();
-    test_exception_handling();
+    // pt_init();
+    // trap_init();
+    // test_timer_interrupt();
+    // test_exception_handling();
+
+    // Lab5
+    test_process_creation();
 }

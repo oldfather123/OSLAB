@@ -5,6 +5,8 @@
 #define KERNBASE 0x80000000L
 #define PHYSTOP (0x80000000L + 128 * 1024 * 1024)
 #define IRQ_TIMER 127
+#define NPROC 64
+#define NAME_LEN 16
 
 // uart.c
 void uart_putc(char c);
@@ -69,7 +71,6 @@ void unregister_interrupt(int irq);
 void enable_interrupt(int irq);
 void disable_interrupt(int irq);
 void interrupt_dispatch(unsigned long scause);
-void handle_division_by_zero(struct trapframe *tf);
 void handle_syscall(struct trapframe *tf);
 void handle_instruction_page_fault(struct trapframe *tf);
 void handle_load_page_fault(struct trapframe *tf);
@@ -79,3 +80,23 @@ void handle_exception(struct trapframe *tf);
 // sbi.c
 void sbi_set_timer(unsigned long time);
 unsigned long get_time(void);
+
+// proc.c
+enum procstate {UNUSED, USED, RUNNABLE, RUNNING, SLEEPING, ZOMBIE};
+struct context {
+  unsigned long ra;
+  unsigned long sp;
+};
+struct proc {
+  struct spinlock lock;
+  int pid;
+  enum procstate state;
+  struct context context;
+  int xstate;
+};
+void proc_init(void);
+struct proc* alloc_process(void);
+void free_process(struct proc *p);
+int create_process(void (*entry)(void));
+void exit_process(struct proc *p, int status);
+int wait_process(int *status);
