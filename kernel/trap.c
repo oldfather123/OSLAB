@@ -6,8 +6,6 @@
 // 中断向量表
 interrupt_handler_t interrupt_vector[MAX_INTERRUPTS];
 
-unsigned long prev_sepc = 0x80200000;
-
 void kernelvec();
 
 void trap_init(void) {
@@ -28,9 +26,6 @@ void kerneltrap(void) {
     unsigned long sepc = r_sepc();       
     unsigned long sstatus = r_sstatus(); 
     unsigned long scause = r_scause(); 
-    // printf("trap sepc: 0x%x\n", r_sepc());
-    // prev_sepc = sepc;
-    // printf("Prev sepc set to: 0x%x\n", prev_sepc);
 
     // 检查中断来自S模式
     if ((sstatus & SSTATUS_SPP) == 0) {
@@ -43,7 +38,13 @@ void kerneltrap(void) {
     }
 
     // 如果是异常（最高位为0），调用异常处理
-    if ((scause >> (8 * sizeof(unsigned long) - 1)) == 0) {
+    if ((scause >> 63) == 0) {
+        // printf("trap sepc: 0x%x\n", sepc >> 32);
+        // printf("prev sepc: 0x%x\n", last_sepc);
+        // if (sepc == 0xFFFFFFFF00000000UL) {
+        //     sepc = last_sepc;
+        //     printf("sepc set to last sepc: 0x%x\n", sepc);
+        // }
         struct trapframe tf;
         tf.sepc = sepc;
         tf.sstatus = sstatus;
@@ -145,8 +146,8 @@ int cnt = 0;
 void handle_instruction_page_fault(struct trapframe *tf) {
     printf("Exception: instruction page fault\n");
     dump_trapframe(tf);
-    cnt++;
     tf->sepc += 4;
+    cnt++;
     if (cnt >= 5) {
         panic("Too many instruction page faults");
     }

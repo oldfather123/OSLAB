@@ -61,6 +61,7 @@ struct trapframe {
     unsigned long stval;
     unsigned long scause;
 };
+// extern unsigned long last_sepc;
 void trap_init(void);
 void kerneltrap(void);
 void register_interrupt(int irq, interrupt_handler_t handler);

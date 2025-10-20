@@ -4,6 +4,8 @@
 
 __attribute__ ((aligned (16))) char stack_top[4096];
 
+// unsigned long last_sepc = 0x80200000;
+
 // Lab2
 void test_printf_basic() {
     printf("Testing integer: %d\n", 42);
@@ -178,24 +180,22 @@ void test_exception_handling(void) {
                  "nop\n"
                  "nop\n");
 
-    // 系统调用异常
+    // 系统调用异常（需要做用户态和内核态切换）
     // printf("System Call Exception\n");
-    // asm volatile("ecall\n"
-    //              "nop\n"
-    //              "nop\n"
-    //              "nop\n");
+    // asm volatile("ecall\n");
+    // asm volatile("nop\nnop\nnop\n");
 
-    // 指令页异常
+    // 指令页异常（越界地址跳转有问题）
     // printf("Instruction Page Fault\n");
     // volatile unsigned long *invalid_instr = (unsigned long *)0xFFFFFFFF00000000UL;
-    // volatile unsigned long *valid_instr = (unsigned long *)(r_sepc() + 4);
     // printf ("Jumping to invalid instruction address: 0x%x\n", (unsigned long)invalid_instr>>32);
-    // printf("Current sepc: 0x%x\n", r_sepc());
+    // last_sepc = r_sepc();
+    // printf("Current sepc: 0x%x\n", last_sepc);
     // asm volatile(
     //     "mv t0, %0\n\t"
     //     "jalr x0, 0(t0)\n\t"
     //     :
-    //     : "r"(valid_instr)
+    //     : "r"(invalid_instr)
     //     : "t0", "memory"
     // );
     // asm volatile("nop\nnop\nnop\n");
@@ -210,7 +210,7 @@ void test_exception_handling(void) {
     // 存储页异常
     printf("Store Page Fault Test\n");
     volatile unsigned long *bad_store = (unsigned long *)0xFFFFFFFF00000000UL;
-    *bad_store = 0x42;
+    *bad_store = 0x66;
     asm volatile("nop\nnop\nnop\n");
 
     printf("Exception tests completed\n");
