@@ -115,7 +115,6 @@ void exit_process(struct proc *p, int status) {
 
 int wait_process(int *status) {
     acquire(&table_lock);
-
     for (int i = 0; i < NPROC; i++) {
         struct proc *p = &proc_table[i];
         acquire(&p->lock);
@@ -141,6 +140,19 @@ int wait_process(int *status) {
 
     release(&table_lock);
     return -1;
+}
+
+void set_proc_priority(int pid, int pri) {
+    for (int i = 0; i < NPROC; i++) {
+        struct proc *p = &proc_table[i];
+        acquire(&p->lock);
+        if (p->pid == pid) {
+            p->priority = pri;
+            release(&p->lock);
+            return;
+        }
+        release(&p->lock);
+    }
 }
 
 void scheduler(void) {

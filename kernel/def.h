@@ -110,6 +110,7 @@ struct proc {
   struct context context;
   int xstate;
   int priority;
+  void *chan;
 };
 extern struct proc proc_table[NPROC];
 extern struct proc *current_proc;
@@ -119,5 +120,6 @@ void free_process(struct proc *p);
 int create_process(void (*entry)(void));
 void exit_process(struct proc *p, int status);
 int wait_process(int *status);
+void set_proc_priority(int pid, int pri);
 void scheduler(void);
 void yield(void);

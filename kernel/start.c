@@ -296,18 +296,6 @@ void cpu_task_low(void) {
 
     exit_process(current_proc, 0);
 }
-void set_proc_priority(int pid, int pri) {
-    for (int i = 0; i < NPROC; i++) {
-        struct proc *p = &proc_table[i];
-        acquire(&p->lock);
-        if (p->pid == pid) {
-            p->priority = pri;
-            release(&p->lock);
-            return;
-        }
-        release(&p->lock);
-    }
-}
 void test_scheduler(void) {
     printf("Testing scheduler...\n");
 
