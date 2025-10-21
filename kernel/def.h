@@ -7,6 +7,8 @@
 #define IRQ_TIMER 127
 #define NPROC 64
 #define NAME_LEN 16
+#define TRAMPOLINE (MAXVA - PGSIZE)
+#define KSTACK(p) (TRAMPOLINE - ((p) + 1) * 2 * PGSIZE)
 
 // uart.c
 void uart_putc(char c);
@@ -86,17 +88,36 @@ enum procstate {UNUSED, USED, RUNNABLE, RUNNING, SLEEPING, ZOMBIE};
 struct context {
   unsigned long ra;
   unsigned long sp;
+
+  unsigned long s0;
+  unsigned long s1;
+  unsigned long s2;
+  unsigned long s3;
+  unsigned long s4;
+  unsigned long s5;
+  unsigned long s6;
+  unsigned long s7;
+  unsigned long s8;
+  unsigned long s9;
+  unsigned long s10;
+  unsigned long s11;
 };
 struct proc {
   struct spinlock lock;
   int pid;
   enum procstate state;
+  void *kstack;
   struct context context;
   int xstate;
+  int priority;
 };
+extern struct proc proc_table[NPROC];
+extern struct proc *current_proc;
 void proc_init(void);
 struct proc* alloc_process(void);
 void free_process(struct proc *p);
 int create_process(void (*entry)(void));
 void exit_process(struct proc *p, int status);
 int wait_process(int *status);
+void scheduler(void);
+void yield(void);

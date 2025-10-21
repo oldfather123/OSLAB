@@ -5,6 +5,8 @@
 __attribute__ ((aligned (16))) char stack_top[4096];
 
 // unsigned long last_sepc = 0x80200000;
+struct proc proc_table[NPROC];
+struct proc *current_proc = 0;
 
 // Lab2
 void test_printf_basic() {
@@ -223,6 +225,7 @@ void pt_init(void) {
 
 // Lab5
 void simple_task(void) {
+    printf("simple tast started\n");
     int a = 1;
 }
 void test_process_creation(void) {
@@ -253,6 +256,77 @@ void test_process_creation(void) {
 
     printf("Process creation test completed\n");
 }
+void cpu_task_high(void) {
+    volatile unsigned long sum = 0;
+    for (int i = 0; i < 10; i++) {
+        for (int j = 0; j < 1000000; j++)
+            sum += j;
+        printf("HIGH iter %d\n", i);
+        // 让出CPU使得调度器运行其他进程
+        yield();
+    }
+    printf("HIGH task completed\n");
+    // 进程无限让出CPU
+    for(;;) yield();
+}
+
+void cpu_task_med(void) {
+    volatile unsigned long sum = 0;
+    for (int i = 0; i < 10; i++) {
+        for (int j = 0; j < 500000; j++)
+            sum += j;
+        printf("MED  iter %d\n", i);
+        yield();
+    }
+    printf("MED  task completed\n");
+    for(;;) yield();
+}
+
+void cpu_task_low(void) {
+    volatile unsigned long sum = 0;
+    for (int i = 0; i < 10; i++) {
+        for (int j = 0; j < 100000; j++)
+            sum += j;
+        printf("LOW  iter %d\n", i);
+        yield();
+    }
+    printf("LOW  task completed\n");
+    for(;;) yield();
+}
+void set_proc_priority(int pid, int pri) {
+    for (int i = 0; i < NPROC; i++) {
+        struct proc *p = &proc_table[i];
+        acquire(&p->lock);
+        if (p->pid == pid) {
+            p->priority = pri;
+            release(&p->lock);
+            return;
+        }
+        release(&p->lock);
+    }
+}
+void test_scheduler(void) {
+    printf("Testing scheduler...\n");
+
+    int pid_high = create_process(cpu_task_high);
+    int pid_med = create_process(cpu_task_med);
+    int pid_low = create_process(cpu_task_low);
+
+    if (pid_high <= 0 || pid_med <= 0 || pid_low <= 0) {
+        printf("create_process failed: %d %d %d\n", pid_high, pid_med, pid_low);
+        return;
+    }
+    printf("Created processes: HIGH = %d, MED = %d, LOW = %d\n", pid_high, pid_med, pid_low);
+
+    // 设置优先级，为了循环运行，每次差值为3
+    set_proc_priority(pid_high, 50);
+    set_proc_priority(pid_med, 49);
+    set_proc_priority(pid_low, 48);
+    printf("Set process priorities\n");
+
+    // 启动调度器
+    scheduler();
+}
 
 void main() {
     // Lab1
@@ -277,5 +351,8 @@ void main() {
     // test_exception_handling();
 
     // Lab5
-    test_process_creation();
+    pt_init();
+    proc_init();
+    // test_process_creation();
+    test_scheduler();
 }

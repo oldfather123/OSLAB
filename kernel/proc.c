@@ -1,9 +1,11 @@
 #include "def.h"
+#include "riscv.h"
 
-struct proc proc_table[NPROC];
 struct spinlock table_lock;
 struct spinlock pid_lock;
 int next_pid = 1;
+// 调度器上下文
+struct context sched_ctx; 
 
 int alloc_pid(void) {
     int pid;
@@ -26,6 +28,8 @@ void proc_init(void) {
         // 初始化进程表项
         initlock(&p->lock, "proc");
         p->state = UNUSED;
+        p->kstack = 0;
+        p->priority = 0;
     }
 }
 
@@ -40,7 +44,23 @@ struct proc* alloc_process(void) {
         if (p->state == UNUSED) {
         p->state = USED;
         p->pid = alloc_pid();
+
+        p->kstack = alloc_page();
+        if (!p->kstack) {
+            // 无法分配内核栈，释放资源并返回
+            p->state = UNUSED;
+            p->pid = 0;
+            release(&p->lock);
+            release(&table_lock);
+            return 0;
+        }
+
+        // 设置上下文
+        unsigned long sp = (unsigned long)p->kstack + PGSIZE;
+        p->context.sp = sp;
+        p->context.ra = 0;
         release(&table_lock);
+
         // 返回时保持p->lock
         return p; 
         }
@@ -54,8 +74,13 @@ struct proc* alloc_process(void) {
 
 void free_process(struct proc *p) {
     acquire(&p->lock);
+    if (p->kstack) {
+        free_page(p->kstack);
+        p->kstack = 0;
+    }
     p->state = UNUSED;
     p->pid = 0;
+    p->priority = 0;
     release(&p->lock);
 }
 
@@ -65,6 +90,9 @@ int create_process(void (*entry)(void)) {
     if (!p) 
         return -1;
 
+    // 设置进程入口
+    p->context.ra = (unsigned long)entry;
+    
     // 将进程状态设置为可运行
     p->state = RUNNABLE;
     release(&p->lock);
@@ -74,12 +102,15 @@ int create_process(void (*entry)(void)) {
 void exit_process(struct proc *p, int status) {
     acquire(&p->lock);
     p->xstate = status;
+    p->state = ZOMBIE;
     release(&p->lock);
+
+    if (current_proc == p) {
+        current_proc = 0;
+    }
 
     // 直接释放进程资源
     free_process(p);
-
-    panic("exit_process: should not return");
 }
 
 int wait_process(int *status) {
@@ -110,4 +141,60 @@ int wait_process(int *status) {
 
     release(&table_lock);
     return -1;
+}
+
+void scheduler(void) {
+    struct proc *p;
+    struct proc *chosen;
+    int highest_priority;
+
+    for (;;) {
+        intr_on();
+        chosen = 0;
+        highest_priority = -1;
+
+        // 选择优先级最高的可运行进程
+        for (p = proc_table; p < &proc_table[NPROC]; p++) {
+            acquire(&p->lock);
+            if (p->state == RUNNABLE) {
+                int pr = p->priority;
+                if (pr > highest_priority) {
+                    highest_priority = pr;
+                    chosen = p;
+                }
+            }
+            release(&p->lock);
+        }
+
+        if (chosen) {
+            acquire(&chosen->lock);
+            if (chosen->state == RUNNABLE) {
+                // 将进程状态设置为运行中
+                chosen->state = RUNNING;
+                current_proc = chosen;
+                
+                // 降低优先级以循环调用进程
+                chosen->priority -= 3;
+                release(&chosen->lock);
+
+                // 保存调度器上下文，恢复进程上下文，运行进程内容
+                swtch(&sched_ctx, &chosen->context);
+
+                // 清除当前进程
+                current_proc = 0;
+            }
+            else
+                release(&chosen->lock);
+        }
+    }
+}
+
+void yield(void) {
+    struct proc *p = current_proc;
+    acquire(&p->lock);
+    p->state = RUNNABLE;
+    release(&p->lock);
+
+    // 保存进程上下文，回到调度器
+    swtch(&p->context, &sched_ctx);   
 }
