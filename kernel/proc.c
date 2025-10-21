@@ -97,6 +97,7 @@ int create_process(void (*entry)(void)) {
     return p->pid;
 }
 
+int exit_count = 0;
 void exit_process(struct proc *p, int status) {
     acquire(&p->lock);
     p->xstate = status;
@@ -106,9 +107,10 @@ void exit_process(struct proc *p, int status) {
     if (current_proc == p) {
         current_proc = 0;
     }
+    exit_count++;
 
-    // 直接释放进程资源
-    free_process(p);
+    // 切换回调度器
+    swtch(&p->context, &sched_ctx);
 }
 
 int wait_process(int *status) {
@@ -147,6 +149,8 @@ void scheduler(void) {
     int highest_priority;
 
     for (;;) {
+        if (exit_count == 3) 
+            return;
         intr_on();
         chosen = 0;
         highest_priority = -1;

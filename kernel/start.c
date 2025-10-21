@@ -266,8 +266,9 @@ void cpu_task_high(void) {
         yield();
     }
     printf("HIGH task completed\n");
-    // 进程无限让出CPU
-    for(;;) yield();
+    
+    // 终止当前进程
+    exit_process(current_proc, 0);
 }
 
 void cpu_task_med(void) {
@@ -279,7 +280,8 @@ void cpu_task_med(void) {
         yield();
     }
     printf("MED  task completed\n");
-    for(;;) yield();
+
+    exit_process(current_proc, 0);
 }
 
 void cpu_task_low(void) {
@@ -291,7 +293,8 @@ void cpu_task_low(void) {
         yield();
     }
     printf("LOW  task completed\n");
-    for(;;) yield();
+
+    exit_process(current_proc, 0);
 }
 void set_proc_priority(int pid, int pri) {
     for (int i = 0; i < NPROC; i++) {
@@ -326,6 +329,7 @@ void test_scheduler(void) {
 
     // 启动调度器
     scheduler();
+    printf("Scheduler test completed\n");
 }
 
 void main() {
