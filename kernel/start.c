@@ -353,6 +353,6 @@ void main() {
     // Lab5
     pt_init();
     proc_init();
-    // test_process_creation();
+    test_process_creation();
     test_scheduler();
 }

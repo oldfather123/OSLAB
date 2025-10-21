@@ -73,7 +73,6 @@ struct proc* alloc_process(void) {
 }
 
 void free_process(struct proc *p) {
-    acquire(&p->lock);
     if (p->kstack) {
         free_page(p->kstack);
         p->kstack = 0;
@@ -81,7 +80,6 @@ void free_process(struct proc *p) {
     p->state = UNUSED;
     p->pid = 0;
     p->priority = 0;
-    release(&p->lock);
 }
 
 int create_process(void (*entry)(void)) {
@@ -121,7 +119,7 @@ int wait_process(int *status) {
         acquire(&p->lock);
 
         // 找到一个已分配的进程
-        if (p->state == USED) {
+        if (p->state == RUNNABLE) {
             int pid = p->pid;
             if (status) {
                 // 获取退出状态
