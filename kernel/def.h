@@ -121,5 +121,12 @@ int create_process(void (*entry)(void));
 void exit_process(struct proc *p, int status);
 int wait_process(int *status);
 void set_proc_priority(int pid, int pri);
-void scheduler(void);
+void scheduler_priority(void);
+void scheduler_rotate(void);
 void yield(void);
+void sleep(void *chan, struct spinlock *lk);
+void wakeup(void *chan);
+
+// swtest.c
+void producer_task(void);
+void consumer_task(void);

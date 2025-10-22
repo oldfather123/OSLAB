@@ -104,10 +104,12 @@ void exit_process(struct proc *p, int status) {
     p->state = ZOMBIE;
     release(&p->lock);
 
-    if (current_proc == p) {
+    if (current_proc == p)
         current_proc = 0;
-    }
     exit_count++;
+
+    // 唤醒队列中的所有进程
+    wakeup((void*)p);
 
     // 切换回调度器
     swtch(&p->context, &sched_ctx);
@@ -115,31 +117,39 @@ void exit_process(struct proc *p, int status) {
 
 int wait_process(int *status) {
     acquire(&table_lock);
-    for (int i = 0; i < NPROC; i++) {
-        struct proc *p = &proc_table[i];
-        acquire(&p->lock);
+    for (;;) {
+        for (int i = 0; i < NPROC; i++) {
+            struct proc *p = &proc_table[i];
+            acquire(&p->lock);
 
-        // 找到一个已分配的进程
-        if (p->state == RUNNABLE) {
-            int pid = p->pid;
-            if (status) {
-                // 获取退出状态
-                *status = p->xstate;
-            }
-            // 直接释放进程资源
-            free_process(p); 
-            release(&p->lock);
-            release(&table_lock);
+            // 找到一个可回收的进程
+            if (p->state == RUNNABLE || p->state == ZOMBIE) {
+                int pid = p->pid;
+                if (status) {
+                    // 获取退出状态
+                    *status = p->xstate;
+                }
+                // 直接释放进程资源
+                free_process(p); 
+                release(&p->lock);
+                release(&table_lock);
             
-            // 返回进程pid
-            return pid;
+                // 返回进程pid
+                return pid;
+            }
+
+            release(&p->lock);
+        }
+        
+        // 当前没有正在运行的进程，无法睡眠
+        if (!current_proc) {
+            release(&table_lock);
+            return -1;
         }
 
-        release(&p->lock);
+        // 没有可以回收的进程，睡眠等待
+        sleep((void*)0xDEADBEEF, &table_lock);
     }
-
-    release(&table_lock);
-    return -1;
 }
 
 void set_proc_priority(int pid, int pri) {
@@ -155,14 +165,12 @@ void set_proc_priority(int pid, int pri) {
     }
 }
 
-void scheduler(void) {
+void scheduler_priority(void) {
     struct proc *p;
     struct proc *chosen;
     int highest_priority;
 
     for (;;) {
-        if (exit_count == 3) 
-            return;
         intr_on();
         chosen = 0;
         highest_priority = -1;
@@ -180,26 +188,76 @@ void scheduler(void) {
             release(&p->lock);
         }
 
-        if (chosen) {
-            acquire(&chosen->lock);
-            if (chosen->state == RUNNABLE) {
-                // 将进程状态设置为运行中
-                chosen->state = RUNNING;
-                current_proc = chosen;
+        // 没有可运行的进程，退出调度器
+        if (!chosen)
+            return;
+
+        acquire(&chosen->lock);
+        if (chosen->state == RUNNABLE) {
+            // 将进程状态设置为运行中
+            chosen->state = RUNNING;
+            current_proc = chosen;
                 
-                // 降低优先级以循环调用进程
-                chosen->priority -= 3;
-                release(&chosen->lock);
+            // 降低优先级以循环调用进程
+            chosen->priority -= 3;
+            release(&chosen->lock);
 
-                // 保存调度器上下文，恢复进程上下文，运行进程内容
-                swtch(&sched_ctx, &chosen->context);
+            // 保存调度器上下文，恢复进程上下文，运行进程内容
+            swtch(&sched_ctx, &chosen->context);
 
-                // 清除当前进程
-                current_proc = 0;
-            }
-            else
-                release(&chosen->lock);
+            // 清除当前进程
+            current_proc = 0;
         }
+        else
+            release(&chosen->lock);
+    }
+}
+
+void scheduler_rotate(void) {
+    struct proc *p;
+    struct proc *chosen;
+
+    // 轮转搜索开始的位置
+    int rr_idx = 0;
+
+    for (;;) {
+        intr_on();
+        chosen = 0;
+
+        // 按轮转顺序查找第一个可运行的进程
+        for (int i = 0; i < NPROC; i++) {
+            int idx = (rr_idx + i) % NPROC;
+            p = &proc_table[idx];
+            acquire(&p->lock);
+            if (p->state == RUNNABLE) {
+                chosen = p;
+                // 更新轮转索引到下一个位置
+                rr_idx = (idx + 1) % NPROC;
+                release(&p->lock);
+                break;
+            }
+            release(&p->lock);
+        }
+
+        // 没有可运行的进程，退出调度器
+        if (!chosen)
+            return;
+
+        acquire(&chosen->lock);
+        if (chosen->state == RUNNABLE) {
+            // 将进程状态设置为运行中
+            chosen->state = RUNNING;
+            current_proc = chosen;
+            release(&chosen->lock);
+
+            // 切换到进程上下文，运行进程内容
+            swtch(&sched_ctx, &chosen->context);
+
+            // 清除当前进程
+            current_proc = 0;
+        } 
+        else
+            release(&chosen->lock);
     }
 }
 
@@ -211,4 +269,41 @@ void yield(void) {
 
     // 保存进程上下文，回到调度器
     swtch(&p->context, &sched_ctx);   
+}
+
+void sleep(void *chan, struct spinlock *lk) {
+    struct proc *p = current_proc;
+    if (!p) {
+        // 调用者不是当前进程，无法睡眠
+        release(lk);
+        return;
+    }
+
+    acquire(&p->lock);
+    release(lk);
+    p->chan = chan;
+    p->state = SLEEPING;
+
+    // 切换回调度器，需要先释放p->lock，否则调度器会死锁
+    release(&p->lock);
+    swtch(&p->context, &sched_ctx);
+
+    // 唤醒后清除睡眠队列
+    acquire(&p->lock);
+    p->chan = 0;
+    release(&p->lock);
+
+    // 重新持有原自旋锁
+    acquire(lk);
+}
+
+void wakeup(void *chan) {
+    struct proc *p;
+    for (p = proc_table; p < &proc_table[NPROC]; p++) {
+        acquire(&p->lock);
+        // 唤醒队列中所有睡眠进程
+        if (p->state == SLEEPING && p->chan == chan)
+            p->state = RUNNABLE;
+        release(&p->lock);
+    }
 }

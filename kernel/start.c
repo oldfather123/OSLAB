@@ -225,7 +225,6 @@ void pt_init(void) {
 
 // Lab5
 void simple_task(void) {
-    printf("simple tast started\n");
     int a = 1;
 }
 void test_process_creation(void) {
@@ -270,7 +269,6 @@ void cpu_task_high(void) {
     // 终止当前进程
     exit_process(current_proc, 0);
 }
-
 void cpu_task_med(void) {
     volatile unsigned long sum = 0;
     for (int i = 0; i < 10; i++) {
@@ -283,7 +281,6 @@ void cpu_task_med(void) {
 
     exit_process(current_proc, 0);
 }
-
 void cpu_task_low(void) {
     volatile unsigned long sum = 0;
     for (int i = 0; i < 10; i++) {
@@ -315,9 +312,24 @@ void test_scheduler(void) {
     set_proc_priority(pid_low, 48);
     printf("Set process priorities\n");
 
-    // 启动调度器
-    scheduler();
+    // 启动优先级调度器
+    scheduler_priority();
     printf("Scheduler test completed\n");
+}
+void test_synchronization(void) {
+    printf("Starting synchronization test\n");
+    shared_buffer_init();
+
+    int pid_p = create_process(producer_task);
+    int pid_c = create_process(consumer_task);
+    if (pid_p <= 0 || pid_c <= 0) {
+        printf("create_process failed: %d %d\n", pid_p, pid_c);
+        return;
+    }
+
+    // 启动轮转调度器
+    scheduler_rotate();
+    printf("Synchronization test completed\n");
 }
 
 void main() {
@@ -347,4 +359,5 @@ void main() {
     proc_init();
     test_process_creation();
     test_scheduler();
+    test_synchronization();
 }
