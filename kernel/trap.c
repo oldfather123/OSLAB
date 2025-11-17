@@ -8,6 +8,12 @@ interrupt_handler_t interrupt_vector[MAX_INTERRUPTS];
 
 void kernelvec();
 
+void plic_init(void) {
+    *(unsigned int*)(PLIC + IRQ_VIRTIO*4) = 1;
+    *(PLIC_SENABLE) = 1 << IRQ_VIRTIO;
+    *(PLIC_SPRIORITY) = 0;
+}
+
 void trap_init(void) {
     // 设置S模式陷阱向量，发生中断时跳转到kernelvec
     w_stvec((unsigned long)kernelvec);
@@ -15,10 +21,15 @@ void trap_init(void) {
     // 开启全局中断
     intr_on(); 
 
+    // 允许S模式外部中断
+    w_sie(r_sie() | SIE_SEIE);
+
     // 初始化中断向量表
     for (int i = 0; i < MAX_INTERRUPTS; i++) {
         interrupt_vector[i] = 0;
     }
+
+    plic_init();
 }
 
 void kerneltrap(void) {
@@ -39,12 +50,6 @@ void kerneltrap(void) {
 
     // 如果是异常（最高位为0），调用异常处理
     if ((scause >> 63) == 0) {
-        // printf("trap sepc: 0x%x\n", sepc >> 32);
-        // printf("prev sepc: 0x%x\n", last_sepc);
-        // if (sepc == 0xFFFFFFFF00000000UL) {
-        //     sepc = last_sepc;
-        //     printf("sepc set to last sepc: 0x%x\n", sepc);
-        // }
         struct trapframe tf;
         tf.sepc = sepc;
         tf.sstatus = sstatus;
@@ -118,7 +123,20 @@ void interrupt_dispatch(unsigned long scause) {
         else {
             panic("Unregistered timer interrupt\n");
         }
-    } 
+    }
+    else if (scause == 0x8000000000000009L) {
+        // 获取中断号
+        unsigned int irq = *(PLIC_SCLAIM);
+
+        // 调用磁盘中断处理函数
+        if (interrupt_vector[IRQ_VIRTIO]) {
+            interrupt_vector[IRQ_VIRTIO]();
+        } 
+        else {
+            panic("Unregistered VirtIO disk interrupt\n");
+        }
+        *(PLIC_SCLAIM) = irq;
+    }
     else {
         panic("Unexpected interrupt\n");
     }
