@@ -6,12 +6,17 @@ OBJDUMP = $(CROSS)objdump
 NM = $(CROSS)nm
 QEMU = qemu-system-riscv64
 
+# Host 工具（用于构建 mkfs）
+HOSTCC = gcc
+HOSTCFLAGS = -O2 -Wall
+MKFS = mkfs
+
 # 编译选项
 CFLAGS = -Wall -O2 -ffreestanding -nostdlib -nostartfiles -mcmodel=medany
 LDFLAGS = -T kernel.ld
 
 # 目标文件
-OBJS = entry.o uart.o console.o printf.o start.o spinlock.o kalloc.o string.o vm.o trap.o kernelvec.o sbi.o proc.o swtch.o swtest.o
+OBJS = entry.o uart.o console.o printf.o start.o spinlock.o kalloc.o string.o vm.o trap.o kernelvec.o sbi.o proc.o swtch.o swtest.o bio.o file.o fs.o sleeplock.o sysfile.o virtio_disk.o log.o snprintf.o
 
 # 最终生成的内核文件
 KERNEL = kernel.elf
@@ -34,9 +39,17 @@ kernelvec.o: kernelvec.S
 $(KERNEL): $(OBJS)
 	$(LD) $(LDFLAGS) $(OBJS) -o $@
 
+# 构建 host 上的 mkfs 工具（用于生成 fs.img）
+$(MKFS): mkfs.c
+	$(HOSTCC) $(HOSTCFLAGS) -I. -o $(MKFS) mkfs.c
+
+# 生成文件系统镜像 fs.img（使用当前目录下的 mkfs）
+fs.img: $(MKFS)
+	./$(MKFS) fs.img
+
 # 运行内核
-run: $(KERNEL)
-	$(QEMU) -machine virt -nographic -bios default -kernel $(KERNEL)
+run: $(KERNEL) fs.img
+	$(QEMU) -machine virt -nographic -bios default -kernel $(KERNEL) -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 # 清理生成的文件
 clean:
 	rm -f $(OBJS) $(KERNEL)

@@ -67,9 +67,8 @@ void free_page(void *page) {
 	if (((unsigned long)page % PGSIZE) != 0 || (char *)page < end || (unsigned long)page >= PHYSTOP)
 		panic("free_page: invalid page");
 
-    // 填充垃圾数据 
+    // 填充垃圾数据
 	memset(page, 1, PGSIZE);
-
     // 优先回收到页面池
     acquire(&page_cache.lock);
     if (page_cache.n < PAGE_POOL_CAP) {

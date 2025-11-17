@@ -105,7 +105,12 @@ void kvm_init(void) {
     // 映射设备
     map_region(kernel_pagetable, UART0, UART0, PGSIZE, PTE_R | PTE_W); 
 
- } 
+    // 映射VirtIO MMIO
+    map_region(kernel_pagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+
+    // 映射PLIC
+    map_region(kernel_pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+} 
  
 
 void kvm_inithart(void) { 

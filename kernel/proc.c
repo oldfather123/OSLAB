@@ -42,27 +42,30 @@ struct proc* alloc_process(void) {
     
         // 寻找未分配的进程表项
         if (p->state == UNUSED) {
-        p->state = USED;
-        p->pid = alloc_pid();
+            p->state = USED;
+            p->pid = alloc_pid();
 
-        p->kstack = alloc_page();
-        if (!p->kstack) {
-            // 无法分配内核栈，释放资源并返回
-            p->state = UNUSED;
-            p->pid = 0;
-            release(&p->lock);
+            p->kstack = alloc_page();
+            if (!p->kstack) {
+                // 无法分配内核栈，释放资源并返回
+                p->state = UNUSED;
+                p->pid = 0;
+                release(&p->lock);
+                release(&table_lock);
+                return 0;
+            }
+
+            // 设置上下文
+            unsigned long sp = (unsigned long)p->kstack + PGSIZE;
+            p->context.sp = sp;
+            p->context.ra = 0;
+
+            // 设置当前目录
+            p->cwd = namei("/");
             release(&table_lock);
-            return 0;
-        }
 
-        // 设置上下文
-        unsigned long sp = (unsigned long)p->kstack + PGSIZE;
-        p->context.sp = sp;
-        p->context.ra = 0;
-        release(&table_lock);
-
-        // 返回时保持p->lock
-        return p; 
+            // 返回时保持p->lock
+            return p; 
         }
 
         release(&p->lock);

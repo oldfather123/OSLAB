@@ -7,6 +7,7 @@ __attribute__ ((aligned (16))) char stack_top[4096];
 // unsigned long last_sepc = 0x80200000;
 struct proc proc_table[NPROC];
 struct proc *current_proc = 0;
+struct superblock sb;
 
 // Lab2
 void test_printf_basic() {
@@ -332,6 +333,168 @@ void test_synchronization(void) {
     printf("Synchronization test completed\n");
 }
 
+// Lab6
+void test_parameter_passing(void) { 
+    printf("Testing parameter passing\n");
+    // 使用绝对路径
+    int fd = sys_open("/test", O_CREATE | O_RDWR); 
+
+    // 写入数据
+    char buffer[] = "Hello, World!"; 
+    if (fd >= 0) { 
+        int bytes_written = sys_write(fd, buffer, strlen(buffer)); 
+        printf("Wrote %d bytes\n", bytes_written); 
+        sys_close(fd); 
+    } 
+ 
+    // 测试边界情况
+    int bytes1 = sys_write(-1, buffer, 10); // 无效文件描述符
+    int bytes2 = sys_write(fd, NULL, 10); // 空指针
+    int bytes3 = sys_write(fd, buffer, -1); // 负数长度
+    printf("bytes1 = %d, bytes2 = %d, bytes3 = %d\n", bytes1, bytes2, bytes3);
+    sys_unlink("/test");
+    
+    printf("Parameter passing test passed\n");
+}
+void test_filesystem_integrity(void) { 
+    printf("Testing filesystem integrity\n"); 
+    // 使用相对路径
+    int fd = sys_open("testfile", O_CREATE | O_RDWR); 
+    assert(fd >= 0); 
+    
+    // 写入数据
+    char buffer[] = "Hello, filesystem!"; 
+    int bytes = sys_write(fd, buffer, strlen(buffer)); 
+    printf("wrote %d bytes\n", bytes);
+    assert(bytes == strlen(buffer)); 
+    sys_close(fd); 
+    
+    // 重新打开并验证数据相同
+    fd = sys_open("testfile", O_RDONLY); 
+    assert(fd >= 0); 
+    char read_buffer[64]; 
+    bytes = sys_read(fd, read_buffer, sizeof(read_buffer)); 
+    read_buffer[bytes] = '\0'; 
+    assert(strncmp(buffer, read_buffer, bytes) == 0); 
+    sys_close(fd); 
+    
+    // 删除文件
+    assert(sys_unlink("testfile") == 0); 
+
+    printf("Filesystem integrity test passed\n"); 
+}
+void concurrent_file_access_task(void) {
+    char filename[32];
+    int pid = current_proc->pid;
+    // 根据pid生成唯一文件名
+    snprintf(filename, sizeof(filename), "testfile_%d", pid);  
+
+    // 创建文件
+    int fd = sys_open(filename, O_CREATE | O_RDWR);
+    if (fd < 0) {
+        printf("Process %d: Failed to create file %s\n", pid, filename);
+        return;
+    }
+    printf("Process %d: Created file %s\n", pid, filename);
+
+    // 写入数据
+    char buffer[] = "Concurrent access test!";
+    int bytes_written = sys_write(fd, buffer, strlen(buffer));
+    if (bytes_written != strlen(buffer)) {
+        printf("Process %d: Failed to write to file %s\n", pid, filename);
+        sys_close(fd);
+        return;
+    }
+    printf("Process %d: Wrote %d bytes to file %s\n", pid, bytes_written, filename);
+    sys_close(fd);
+    yield();
+
+    // 重新打开文件并读取数据
+    fd = sys_open(filename, O_RDONLY);
+    if (fd < 0) {
+        printf("Process %d: Failed to reopen file %s\n", pid, filename);
+        return;
+    }
+    char read_buffer[64];
+    int bytes_read = sys_read(fd, read_buffer, sizeof(read_buffer) - 1);
+    if (bytes_read < 0) {
+        printf("Process %d: Failed to read from file %s\n", pid, filename);
+        sys_close(fd);
+        return;
+    }
+    read_buffer[bytes_read] = '\0';  // 确保字符串以 '\0' 结尾
+    printf("Process %d: Read %d bytes from file %s\n", pid, bytes_read, filename);
+    sys_close(fd);
+
+    // 删除文件
+    if (sys_unlink(filename) == 0)
+        printf("Process %d: Deleted file %s\n", pid, filename);
+    else
+        printf("Process %d: Failed to delete file %s\n", pid, filename);
+    
+    exit_process(current_proc, 0);
+}
+void test_concurrent_file_access(void) {
+    printf("Testing concurrent file access\n");
+
+    int num_processes = 5;
+    int pids[5];
+
+    for (int i = 0; i < num_processes; i++) {
+        int pid = create_process(concurrent_file_access_task);
+        if (pid > 0) {
+            pids[i] = pid;
+        } 
+        else {
+            printf("Failed to create process %d\n", i);
+        }
+    }
+
+    // 使用轮转调度器
+    scheduler_rotate();
+
+    printf("Concurrent file access test completed\n");
+}
+void test_filesystem_performance(void) {
+    printf("Testing filesystem performance\n"); 
+    // unsigned long start_time = get_time();
+    // printf("Starting performance test at %d cycles\n", start_time);
+    int tfd = sys_open("testfile111", O_CREATE | O_RDWR);
+    printf("Opened tfd\n");
+
+    // 大量小文件测试
+    for (int i = 0; i < 1000; i++) {
+        char filename[32];
+        snprintf(filename, sizeof(filename), "small_%d", i);
+        int fd = sys_open(filename, O_CREATE | O_RDWR);
+        sys_write(fd, "test", 4); 
+        sys_close(fd); 
+    }
+    // unsigned long small_files_time = get_time() - start_time;
+    // printf("Small files (1000x4B): %d cycles\n", small_files_time);
+
+    // 大文件测试
+    // start_time = get_time();
+    int fd = sys_open("large_file", O_CREATE | O_RDWR);
+    char large_buffer[4096];
+    for (int i = 0; i < 1024; i++) {  // 4MB文件
+        sys_write(fd, large_buffer, sizeof(large_buffer));
+    }
+    sys_close(fd);
+    // unsigned long large_file_time = get_time() - start_time;
+    // printf("Large file (1x4MB): %d cycles\n", large_file_time);
+
+    // 清理测试文件
+    for (int i = 0; i < 1000; i++) {
+        char filename[32];
+        snprintf(filename, sizeof(filename), "small_%d", i);
+        sys_unlink(filename);
+    }
+
+    sys_unlink("large_file");
+    printf("Filesystem performance test completed\n");
+}
+
 void main() {
     // Lab1
     // uart_puts("Hello OS");
@@ -342,11 +505,11 @@ void main() {
     // clear_screen();
 
     // Lab3
-    // pmm_init();
-    // test_alloc_pages();
-    // test_physical_memory();
-    // test_pagetable();
-    // test_virtual_memory();
+    pmm_init();
+    test_alloc_pages();
+    test_physical_memory();
+    test_pagetable();
+    test_virtual_memory();
 
     // Lab4
     // pt_init();
@@ -355,9 +518,25 @@ void main() {
     // test_exception_handling();
 
     // Lab5
-    pt_init();
-    proc_init();
-    test_process_creation();
-    test_scheduler();
-    test_synchronization();
+    // pt_init();
+    // proc_init();
+    // test_process_creation();
+    // test_scheduler();
+    // test_synchronization();
+
+    // Lab6
+    // pt_init();
+    // proc_init();
+    // current_proc = alloc_process();
+    // release(&current_proc->lock);
+    // trap_init();
+    // iinit();
+    // binit();
+    // fileinit();
+    // virtio_disk_init();
+    // fsinit(ROOTDEV);
+    // test_parameter_passing();
+    // test_filesystem_integrity();
+    // test_concurrent_file_access();
+    // test_filesystem_performance();
 }
