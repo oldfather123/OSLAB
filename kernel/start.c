@@ -2,7 +2,7 @@
 #include "assert.h"
 #include "riscv.h"
 
-__attribute__ ((aligned (16))) char stack_top[4096];
+__attribute__ ((aligned (16))) char stack_top[16384];
 
 // unsigned long last_sepc = 0x80200000;
 struct proc proc_table[NPROC];
@@ -457,12 +457,9 @@ void test_concurrent_file_access(void) {
 }
 void test_filesystem_performance(void) {
     printf("Testing filesystem performance\n"); 
-    // unsigned long start_time = get_time();
-    // printf("Starting performance test at %d cycles\n", start_time);
-    int tfd = sys_open("testfile111", O_CREATE | O_RDWR);
-    printf("Opened tfd\n");
 
-    // 大量小文件测试
+    // 小文件测试
+    unsigned long start_time = get_time();
     for (int i = 0; i < 1000; i++) {
         char filename[32];
         snprintf(filename, sizeof(filename), "small_%d", i);
@@ -470,19 +467,19 @@ void test_filesystem_performance(void) {
         sys_write(fd, "test", 4); 
         sys_close(fd); 
     }
-    // unsigned long small_files_time = get_time() - start_time;
-    // printf("Small files (1000x4B): %d cycles\n", small_files_time);
+    unsigned long small_files_time = get_time() - start_time;
+    printf("Small files (1000x4B): %d cycles\n", small_files_time);
 
     // 大文件测试
-    // start_time = get_time();
+    start_time = get_time();
     int fd = sys_open("large_file", O_CREATE | O_RDWR);
     char large_buffer[4096];
-    for (int i = 0; i < 1024; i++) {  // 4MB文件
+    for (int i = 0; i < 32; i++) {
         sys_write(fd, large_buffer, sizeof(large_buffer));
     }
     sys_close(fd);
-    // unsigned long large_file_time = get_time() - start_time;
-    // printf("Large file (1x4MB): %d cycles\n", large_file_time);
+    unsigned long large_file_time = get_time() - start_time;
+    printf("Large file (1x128KB): %d cycles\n", large_file_time);
 
     // 清理测试文件
     for (int i = 0; i < 1000; i++) {
@@ -505,11 +502,11 @@ void main() {
     // clear_screen();
 
     // Lab3
-    pmm_init();
-    test_alloc_pages();
-    test_physical_memory();
-    test_pagetable();
-    test_virtual_memory();
+    // pmm_init();
+    // test_alloc_pages();
+    // test_physical_memory();
+    // test_pagetable();
+    // test_virtual_memory();
 
     // Lab4
     // pt_init();
@@ -525,18 +522,20 @@ void main() {
     // test_synchronization();
 
     // Lab6
-    // pt_init();
-    // proc_init();
-    // current_proc = alloc_process();
-    // release(&current_proc->lock);
-    // trap_init();
-    // iinit();
-    // binit();
-    // fileinit();
-    // virtio_disk_init();
-    // fsinit(ROOTDEV);
-    // test_parameter_passing();
-    // test_filesystem_integrity();
-    // test_concurrent_file_access();
-    // test_filesystem_performance();
+    pt_init();
+    proc_init();
+    current_proc = alloc_process();
+    release(&current_proc->lock);
+    trap_init();
+    iinit();
+    binit();
+    fileinit();
+    virtio_disk_init();
+    fsinit(ROOTDEV);
+    test_parameter_passing();
+    test_filesystem_integrity();
+    test_concurrent_file_access();
+    current_proc = alloc_process();
+    release(&current_proc->lock);
+    test_filesystem_performance();
 }

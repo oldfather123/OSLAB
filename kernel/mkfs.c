@@ -16,7 +16,7 @@ typedef unsigned int   uint;
 typedef unsigned short ushort;
 typedef unsigned char  uchar;
 
-#define NINODES 200
+#define NINODES 2000
 #define NLOG    30
 #define NMETA   2 
 #define NBLOCKS 1000 
@@ -64,7 +64,6 @@ struct dirent {
   char name[DIRSIZ];
 };
 
-#define NINODES 200
 
 // Disk layout:
 // [ boot block | sb block | log | inode blocks | free bit map | data blocks ]
