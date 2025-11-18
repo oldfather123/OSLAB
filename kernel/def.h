@@ -21,10 +21,8 @@
 #define T_FILE 2
 #define T_DEVICE 3
 #define DIRSIZ 14
-#define NDIRECT 12
 #define NDEV 10
 #define NFILE 100 
-#define BSIZE 1024
 #define MAXARG 32
 #define MAXOPBLOCKS 10 
 #define LOGBLOCKS (MAXOPBLOCKS*3)

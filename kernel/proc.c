@@ -100,7 +100,6 @@ int create_process(void (*entry)(void)) {
     return p->pid;
 }
 
-int exit_count = 0;
 void exit_process(struct proc *p, int status) {
     acquire(&p->lock);
     p->xstate = status;
@@ -109,7 +108,21 @@ void exit_process(struct proc *p, int status) {
 
     if (current_proc == p)
         current_proc = 0;
-    exit_count++;
+
+    // 关闭进程打开的文件
+    for(int fd = 0; fd < NOFILE; fd++) {
+        if(p->ofile[fd]) {
+            struct file *f = p->ofile[fd];
+            fileclose(f);
+            p->ofile[fd] = 0;
+        }
+    }
+
+    // 释放进程目录的inode
+    begin_op();
+    iput(p->cwd);
+    end_op();
+    p->cwd = 0;
 
     // 唤醒队列中的所有进程
     wakeup((void*)p);

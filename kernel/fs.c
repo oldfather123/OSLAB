@@ -168,12 +168,8 @@ void ilock(struct inode *ip) {
     struct buf *bp;
     struct dinode *dip;
 
-    // if (ip == 0 || ip->ref < 1)
-    //     panic("ilock");
-    if (ip == 0)
-        panic("ilock: ip is null");
-    if (ip->ref < 1)
-        panic("ilock: ip ref < 1");
+    if (ip == 0 || ip->ref < 1)
+        panic("ilock");
 
     // 获取inode的睡眠锁
     acquiresleep(&ip->lock);
