@@ -31,6 +31,9 @@ entry.o: entry.S
 kernelvec.o: kernelvec.S
 	$(CC) $(CFLAGS) -c $< -o $@
 
+swtch.o: swtch.S
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # 编译 C 文件
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -52,4 +55,4 @@ run: $(KERNEL) fs.img
 	$(QEMU) -machine virt -nographic -bios default -kernel $(KERNEL) -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 # 清理生成的文件
 clean:
-	rm -f $(OBJS) $(KERNEL)
+	rm -f $(OBJS) $(KERNEL) fs.img

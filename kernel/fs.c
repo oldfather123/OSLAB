@@ -280,6 +280,11 @@ static unsigned int bmap(struct inode *ip, unsigned int bn) {
             if (addr == 0)
                 return 0;
             ip->addrs[NDIRECT] = addr;
+            bp = bread(ip->dev, addr);
+            // 清除间接块内容
+            memset(bp->data, 0, BSIZE);
+            log_write(bp);
+            brelse(bp);
         }
         bp = bread(ip->dev, addr);
         a = (unsigned int *)bp->data;
