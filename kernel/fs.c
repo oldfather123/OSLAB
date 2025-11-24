@@ -3,7 +3,7 @@
 
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
-static void readsb(int dev, struct superblock *sb) {
+void readsb(int dev, struct superblock *sb) {
     struct buf *bp;
 
     // 读取超级块所在扇区
