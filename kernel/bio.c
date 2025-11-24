@@ -120,3 +120,13 @@ void bunpin(struct buf *b) {
     b->refcnt--;
     release(&bcache.lock);
 }
+
+void bcache_reset(void) {
+    acquire(&bcache.lock);
+    // 重置缓冲区状态
+    for (int i = 0; i < NBUF; i++) {
+        bcache.buf[i].valid = 0;
+        bcache.buf[i].refcnt = 0;
+    }
+    release(&bcache.lock);
+}

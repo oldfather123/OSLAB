@@ -289,6 +289,7 @@ struct inode *dirlookup(struct inode *dp, char *name, unsigned int *poff);
 int dirlink(struct inode *dp, char *name, unsigned int inum);
 struct inode *namei(char *path);
 struct inode *nameiparent(char *path, char *name);
+void readsb(int dev, struct superblock *sb);
 
 // virtio_disk.c
 void virtio_disk_init(void);
@@ -302,6 +303,7 @@ void bwrite(struct buf *b);
 void brelse(struct buf *b);
 void bpin(struct buf *b);
 void bunpin(struct buf *b);
+void bcache_reset(void);
 
 // log.c
 void initlog(int dev, struct superblock *sb);

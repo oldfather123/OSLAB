@@ -470,7 +470,7 @@ void test_filesystem_performance(void) {
     unsigned long small_files_time = get_time() - start_time;
     printf("Small files (1000x4B): %d cycles\n", small_files_time);
 
-    // 大文件测试
+    // 大文件测试，由于bmap只支持一个间接块，128KB才小于上限
     start_time = get_time();
     int fd = sys_open("large_file", O_CREATE | O_RDWR);
     char large_buffer[4096];
@@ -490,6 +490,67 @@ void test_filesystem_performance(void) {
 
     sys_unlink("large_file");
     printf("Filesystem performance test completed\n");
+}
+static void simulate_crash_reboot(void) {
+    // 清除缓冲区模拟崩溃
+    bcache_reset();
+    // 重启文件系统
+    readsb(ROOTDEV, &sb);
+    initlog(ROOTDEV, &sb);
+}
+static void unsafe_detach_fd(int fd) {
+    // 进行不安全的文件关闭
+    if (fd < 0) return;
+    struct file *f = current_proc->ofile[fd];
+    if (!f) return;
+    current_proc->ofile[fd] = 0;
+    f->ref--;
+}
+static void unsafe_uncommitted_overwrite(const char *name, const char *data) {
+    // 只开始日志操作，但不结束，会出现崩溃
+    begin_op();
+    int fd = sys_open((char*)name, O_RDWR);
+    struct file *f = current_proc->ofile[fd];
+    ilock(f->ip);
+    writei(f->ip, 0, (unsigned long)data, 0, 1);
+    iunlock(f->ip);
+    unsafe_detach_fd(fd);
+}
+void test_crash_recovery(void) {
+    printf("Testing crash recovery with log\n");
+    char buf[4] = {0};
+
+    // 正常写入A
+    int fd = sys_open("logtest", O_CREATE | O_TRUNC | O_RDWR);
+    sys_write(fd, "A", 1);
+    sys_close(fd);
+
+    // 重启验证A成功提交
+    simulate_crash_reboot();
+    fd = sys_open("logtest", O_RDONLY);
+    sys_read(fd, buf, 1);
+    sys_close(fd);
+    printf("After reboot committed A -> %c\n", buf[0]);
+
+    // 正常写入B
+    fd = sys_open("logtest", O_RDWR);
+    sys_write(fd, "B", 1);
+    sys_close(fd);
+
+    // 不安全写入C，应该不能提交，文件内容仍为B
+    unsafe_uncommitted_overwrite("logtest", "C");
+
+    // 重启验证C未提交
+    simulate_crash_reboot();
+    memset(buf, 0, sizeof(buf));
+    fd = sys_open("logtest", O_RDONLY);
+    sys_read(fd, buf, 1);
+    sys_close(fd);
+    printf("After uncommitted overwrite crash expect B -> %c\n", buf[0]);
+
+    sys_unlink("logtest");
+
+    printf("Crash recovery test finished\n");
 }
 
 void main() {
@@ -538,4 +599,5 @@ void main() {
     current_proc = alloc_process();
     release(&current_proc->lock);
     test_filesystem_performance();
+    test_crash_recovery();
 }
