@@ -1,7 +1,7 @@
 #include "def.h"
 #include "riscv.h"
 
-struct spinlock table_lock;
+struct spinlock wait_lock;
 struct spinlock pid_lock;
 int next_pid = 1;
 // 调度器上下文
@@ -20,8 +20,9 @@ int alloc_pid(void) {
 }
 
 void proc_init(void) {
-    // 创建进程表自旋锁
-    initlock(&table_lock, "proc_table");
+    // 初始化pid锁和wait锁
+    initlock(&pid_lock, "pid_lock");
+    initlock(&wait_lock, "wait_lock");
   
     for (int i = 0; i < NPROC; i++) {
         struct proc *p = &proc_table[i];
@@ -34,8 +35,6 @@ void proc_init(void) {
 }
 
 struct proc* alloc_process(void) {
-    acquire(&table_lock);
-
     for (int i = 0; i < NPROC; i++) {
         struct proc *p = &proc_table[i];
         acquire(&p->lock);
@@ -51,7 +50,6 @@ struct proc* alloc_process(void) {
                 p->state = UNUSED;
                 p->pid = 0;
                 release(&p->lock);
-                release(&table_lock);
                 return 0;
             }
 
@@ -62,7 +60,6 @@ struct proc* alloc_process(void) {
 
             // 设置当前目录
             p->cwd = namei("/");
-            release(&table_lock);
 
             // 返回时保持p->lock
             return p; 
@@ -71,7 +68,6 @@ struct proc* alloc_process(void) {
         release(&p->lock);
     }
 
-    release(&table_lock);
     return 0;
 }
 
@@ -132,7 +128,6 @@ void exit_process(struct proc *p, int status) {
 }
 
 int wait_process(int *status) {
-    acquire(&table_lock);
     for (;;) {
         for (int i = 0; i < NPROC; i++) {
             struct proc *p = &proc_table[i];
@@ -148,7 +143,6 @@ int wait_process(int *status) {
                 // 直接释放进程资源
                 free_process(p); 
                 release(&p->lock);
-                release(&table_lock);
             
                 // 返回进程pid
                 return pid;
@@ -158,13 +152,11 @@ int wait_process(int *status) {
         }
         
         // 当前没有正在运行的进程，无法睡眠
-        if (!current_proc) {
-            release(&table_lock);
+        if (!current_proc)
             return -1;
-        }
 
         // 没有可以回收的进程，睡眠等待
-        sleep((void*)0xDEADBEEF, &table_lock);
+        sleep((void*)0xDEADBEEF, &wait_lock);
     }
 }
 
