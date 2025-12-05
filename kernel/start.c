@@ -356,6 +356,67 @@ void test_parameter_passing(void) {
     
     printf("Parameter passing test passed\n");
 }
+void test_security(void) {
+    printf("Testing security\n");
+    // 测试无效指针访问
+    char *invalid_ptr = (char*)0x1000000;  // 可能无效的地址
+    int result = sys_write(1, invalid_ptr, 10); 
+    printf("Invalid pointer write result: %d\n", result); 
+
+    // 测试缓冲区边界
+    char small_buf[4]; 
+    result = sys_read(0, small_buf, 1000);  // 尝试读取超过缓冲区大小
+    printf("Buffer overflow read result: %d\n", result);
+
+    // 测试权限检查
+    int fd = sys_open("perm_test", O_CREATE | O_RDWR);
+    if (fd >= 0) {
+        sys_write(fd, "A", 1);
+        sys_close(fd);
+    } 
+    else {
+        printf("perm_test create failed: %d\n", fd);
+    }
+
+    int fd_ro = sys_open("perm_test", O_RDONLY);
+    if (fd_ro >= 0) {
+        // 尝试写入只读文件
+        int w_ro = sys_write(fd_ro, "B", 1);
+        printf("Write on O_RDONLY result: %d\n", w_ro);
+        sys_close(fd_ro);
+    } 
+    else {
+        printf("Open perm_test O_RDONLY failed: %d\n", fd_ro);
+    }
+
+    int fd_rw = sys_open("perm_test", O_RDWR);
+    if (fd_rw >= 0) {
+        // 尝试写入可读写文件
+        int w_rw = sys_write(fd_rw, "C", 1);
+        printf("Write on O_RDWR result: %d\n", w_rw);
+        sys_close(fd_rw);
+    } 
+    else {
+        printf("Open perm_test O_RDWR failed: %d\n", fd_rw);
+    }
+
+    sys_unlink("perm_test");
+
+    printf("Security test completed\n");
+}
+void test_syscall_performance(void) { 
+    unsigned long start_time = get_time(); 
+
+    // 大量系统调用测试
+    for (int i = 0; i < 10000; i++) { 
+        sys_getpid();
+    } 
+
+    unsigned long end_time = get_time(); 
+    printf("10000 getpid() calls took %d cycles\n", end_time - start_time); 
+}
+
+// Lab7
 void test_filesystem_integrity(void) { 
     printf("Testing filesystem integrity\n"); 
     // 使用相对路径
@@ -594,10 +655,24 @@ void main() {
     virtio_disk_init();
     fsinit(ROOTDEV);
     test_parameter_passing();
-    test_filesystem_integrity();
-    test_concurrent_file_access();
-    current_proc = alloc_process();
-    release(&current_proc->lock);
-    test_filesystem_performance();
-    test_crash_recovery();
+    test_security();
+    test_syscall_performance();
+
+    // Lab7
+    // pt_init();
+    // proc_init();
+    // current_proc = alloc_process();
+    // release(&current_proc->lock);
+    // trap_init();
+    // iinit();
+    // binit();
+    // fileinit();
+    // virtio_disk_init();
+    // fsinit(ROOTDEV);
+    // test_filesystem_integrity();
+    // test_concurrent_file_access();
+    // current_proc = alloc_process();
+    // release(&current_proc->lock);
+    // test_filesystem_performance();
+    // test_crash_recovery();
 }

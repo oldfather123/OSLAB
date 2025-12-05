@@ -313,3 +313,9 @@ void log_write(struct buf *b);
 
 // snprintf.c
 int snprintf(char *str, unsigned int size, const char *format, ...);
+
+// sysproc.c
+unsigned long sys_exit(int status);
+unsigned long sys_getpid(void);
+// unsigned long sys_fork(void);
+unsigned long sys_wait(int *status);
