@@ -50,7 +50,7 @@ void kerneltrap(void) {
 
     // 如果是异常（最高位为0），调用异常处理
     if ((scause >> 63) == 0) {
-        struct trapframe tf;
+        struct tframe tf;
         tf.sepc = sepc;
         tf.sstatus = sstatus;
         tf.stval = r_stval();
@@ -142,7 +142,7 @@ void interrupt_dispatch(unsigned long scause) {
     }
 }
 
-void dump_trapframe(struct trapframe *tf) {
+void dump_tframe(struct tframe *tf) {
     printf("=== Trapframe Dump ===\n");
     printf("sepc    : 0x%x\n", tf->sepc);
     printf("sstatus : 0x%x\n", tf->sstatus);
@@ -150,20 +150,20 @@ void dump_trapframe(struct trapframe *tf) {
     printf("scause  : 0x%x\n", tf->scause);
 }
 
-void handle_illegal_instruction(struct trapframe *tf) {
+void handle_illegal_instruction(struct tframe *tf) {
     printf("Exception: illegal instruction\n");
     tf->sepc += 4;
 }
 
-void handle_syscall(struct trapframe *tf) {
+void handle_syscall(struct tframe *tf) {
     printf("Exception: syscall\n");
     tf->sepc += 4;
 }
 
 int cnt = 0;
-void handle_instruction_page_fault(struct trapframe *tf) {
+void handle_instruction_page_fault(struct tframe *tf) {
     printf("Exception: instruction page fault\n");
-    dump_trapframe(tf);
+    dump_tframe(tf);
     tf->sepc += 4;
     cnt++;
     if (cnt >= 5) {
@@ -171,18 +171,18 @@ void handle_instruction_page_fault(struct trapframe *tf) {
     }
 }
 
-void handle_load_page_fault(struct trapframe *tf) {
+void handle_load_page_fault(struct tframe *tf) {
     printf("Exception: load page fault\n");
     tf->sepc += 4;
 }
 
-void handle_store_page_fault(struct trapframe *tf) {
+void handle_store_page_fault(struct tframe *tf) {
     printf("Exception: store page fault\n");
     tf->sepc += 4;
 }
 
 // 异常处理函数
-void handle_exception(struct trapframe *tf) {
+void handle_exception(struct tframe *tf) {
     // 去掉中断位
     unsigned long cause = r_scause() & (~(1UL << (8 * sizeof(unsigned long) - 1))); 
     printf("scause: 0x%x\n", cause);
