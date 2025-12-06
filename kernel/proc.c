@@ -154,6 +154,8 @@ int create_process(void (*entry)(void)) {
     
     // 将进程状态设置为可运行
     p->state = RUNNABLE;
+    p->timeslice = 0;
+    p->timetotal = 0;
     release(&p->lock);
     return p->pid;
 }
@@ -443,4 +445,88 @@ void forkret(void) {
     unsigned long satp = MAKE_SATP(p->pagetable);
     unsigned long trampoline_userret = TRAMPOLINE + (userret - trampoline);
     ((void (*)(unsigned long))trampoline_userret)(satp);
+}
+
+void scheduler_priority_extend(int aging) {
+    struct proc *p;
+    struct proc *chosen;
+    int highest_priority;
+    int ts;
+    int pid;
+
+    for (;;) {
+        intr_on();
+        chosen = 0;
+        highest_priority = -1;
+        ts = 1000000;
+        pid = 1000000;
+
+        // 选择优先级最高的可运行进程
+        for (p = proc_table; p < &proc_table[NPROC]; p++) {
+            acquire(&p->lock);
+            if (p->state == RUNNABLE) {
+                int pr = p->priority;
+                if (pr > highest_priority) {
+                    highest_priority = pr;
+                    ts = p->timeslice;
+                    pid = p->pid;
+                    chosen = p;
+                }
+                else if (pr == highest_priority) {
+                    // 优先级相同，选择时间片更少的进程
+                    if (p->timeslice < ts) {
+                        ts = p->timeslice;
+                        chosen = p;
+                    }
+                    else if (p->timeslice == ts) {
+                        // 时间片也相同，选择pid更小的进程
+                        if (p->pid < pid) {
+                            pid = p->pid;
+                            chosen = p;
+                        }
+                    }
+                }
+            }
+            release(&p->lock);
+        }
+
+        // 没有可运行的进程，退出调度器
+        if (!chosen)
+            return;
+
+        // 对未被选中的进程进行老化处理
+        if (aging) {
+            for (p = proc_table; p < &proc_table[NPROC]; p++) {
+                acquire(&p->lock);
+                if (p->state == RUNNABLE && p != chosen) {
+                    p->timetotal++;
+                    // 最长等待时间为2
+                    if (p->timetotal >= MAX_TIME) {
+                        p->priority++;
+                        p->timetotal = 0;
+                    }
+                }
+                release(&p->lock);
+            }
+        }
+
+        acquire(&chosen->lock);
+        if (chosen->state == RUNNABLE) {
+            // 将进程状态设置为运行中
+            chosen->state = RUNNING;
+            // 增加时间片
+            chosen->timeslice++;
+            current_proc = chosen;
+                
+            release(&chosen->lock);
+
+            // 保存调度器上下文，恢复进程上下文，运行进程内容
+            swtch(&sched_ctx, &chosen->context);
+
+            // 清除当前进程
+            current_proc = 0;
+        }
+        else
+            release(&chosen->lock);
+    }
 }

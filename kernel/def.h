@@ -42,8 +42,7 @@
 #define PLIC_SPRIORITY ((volatile unsigned int *)(PLIC + 0x201000))
 #define PLIC_SCLAIM ((volatile unsigned int *)(PLIC + 0x201004))
 #define FSSIZE 2000 
-#define USER_CODE_BASE  0x400000UL
-#define USER_STACK_TOP  0x800000UL
+#define MAX_TIME 2
 
 // uart.c
 void uart_putc(char c);
@@ -198,6 +197,8 @@ struct proc {
     unsigned long sz;
     pagetable_t pagetable;
     struct trapframe *trapframe;
+    int timeslice;
+    int timetotal;
 };
 extern struct proc proc_table[NPROC];
 extern struct proc *current_proc;
@@ -215,6 +216,7 @@ void sleep(void *chan, struct spinlock *lk);
 void wakeup(void *chan);
 int fork_process(void);
 void forkret(void);
+void scheduler_priority_extend(int aging);
 
 // swtest.c
 void producer_task(void);

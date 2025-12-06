@@ -259,7 +259,7 @@ void test_process_creation(void) {
 }
 void cpu_task_high(void) {
     volatile unsigned long sum = 0;
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 1000000; j++)
             sum += j;
         printf("HIGH iter %d\n", i);
@@ -273,7 +273,7 @@ void cpu_task_high(void) {
 }
 void cpu_task_med(void) {
     volatile unsigned long sum = 0;
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 500000; j++)
             sum += j;
         printf("MED  iter %d\n", i);
@@ -285,7 +285,7 @@ void cpu_task_med(void) {
 }
 void cpu_task_low(void) {
     volatile unsigned long sum = 0;
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 5; i++) {
         for (int j = 0; j < 100000; j++)
             sum += j;
         printf("LOW  iter %d\n", i);
@@ -639,6 +639,68 @@ void test_crash_recovery(void) {
     printf("Crash recovery test finished\n");
 }
 
+// Lab8
+void test_scheduler_1(void) {
+    printf("Testing scheduler 1...\n");
+
+    int pid_high = create_process(cpu_task_high);
+    int pid_med = create_process(cpu_task_med);
+
+    if (pid_high <= 0 || pid_med <= 0 ) {
+        printf("create_process failed: %d %d\n", pid_high, pid_med);
+        return;
+    }
+
+    // 设置高低优先级
+    set_proc_priority(pid_high, 50);
+    set_proc_priority(pid_med, 10);
+    printf("Set process priorities, HIGH = 50, MED = 10\n");
+
+    // 启动调度器
+    scheduler_priority_extend(0);
+    printf("Scheduler test 1 completed\n");
+}
+void test_scheduler_2(void) {
+    printf("Testing scheduler 2...\n");
+
+    int pid_high = create_process(cpu_task_high);
+    int pid_med = create_process(cpu_task_med);
+
+    if (pid_high <= 0 || pid_med <= 0 ) {
+        printf("create_process failed: %d %d\n", pid_high, pid_med);
+        return;
+    }
+
+    // 设置相等优先级
+    set_proc_priority(pid_high, 50);
+    set_proc_priority(pid_med, 50);
+    printf("Set process priorities, HIGH = 50, MED = 50\n");
+
+    // 启动调度器
+    scheduler_priority_extend(0);
+    printf("Scheduler test 2 completed\n");
+}
+void test_scheduler_3(void) {
+    printf("Testing scheduler 3...\n");
+
+    int pid_high = create_process(cpu_task_high);
+    int pid_med = create_process(cpu_task_med);
+
+    if (pid_high <= 0 || pid_med <= 0 ) {
+        printf("create_process failed: %d %d\n", pid_high, pid_med);
+        return;
+    }
+
+    // 设置近似优先级
+    set_proc_priority(pid_high, 50);
+    set_proc_priority(pid_med, 49);
+    printf("Set process priorities, HIGH = 50, MED = 49\n");
+
+    // 启动调度器，启用老化机制
+    scheduler_priority_extend(1);
+    printf("Scheduler test 3 completed\n");
+}
+
 void main() {
     // Lab1
     // uart_puts("Hello OS");
@@ -664,26 +726,25 @@ void main() {
     // Lab5
     // pt_init();
     // proc_init();
-    // trap_init();
     // test_process_creation();
     // test_scheduler();
     // test_synchronization();
 
     // Lab6
-    pt_init();
-    proc_init();
-    current_proc = alloc_process();
-    release(&current_proc->lock);
-    trap_init();
-    iinit();
-    binit();
-    fileinit();
-    virtio_disk_init();
-    fsinit(ROOTDEV);
-    test_basic_syscalls();
-    test_parameter_passing();
-    test_security();
-    test_syscall_performance();
+    // pt_init();
+    // proc_init();
+    // current_proc = alloc_process();
+    // release(&current_proc->lock);
+    // trap_init();
+    // iinit();
+    // binit();
+    // fileinit();
+    // virtio_disk_init();
+    // fsinit(ROOTDEV);
+    // test_basic_syscalls();
+    // test_parameter_passing();
+    // test_security();
+    // test_syscall_performance();
 
     // Lab7
     // pt_init();
@@ -702,4 +763,11 @@ void main() {
     // release(&current_proc->lock);
     // test_filesystem_performance();
     // test_crash_recovery();
+
+    // Lab8
+    pt_init();
+    proc_init();
+    test_scheduler_1();
+    test_scheduler_2();
+    test_scheduler_3();
 }
