@@ -42,6 +42,8 @@
 #define PLIC_SPRIORITY ((volatile unsigned int *)(PLIC + 0x201000))
 #define PLIC_SCLAIM ((volatile unsigned int *)(PLIC + 0x201004))
 #define FSSIZE 2000 
+#define USER_CODE_BASE  0x400000UL
+#define USER_STACK_TOP  0x800000UL
 
 // uart.c
 void uart_putc(char c);
@@ -93,6 +95,9 @@ pte_t* walk_lookup(pagetable_t pt, unsigned long va);
 void kvm_init(void);
 void kvm_inithart(void);
 void map_region(pagetable_t kpgtbl, unsigned long va, unsigned long pa, unsigned long sz, int perm);
+void unmap_page(pagetable_t pagetable, unsigned long va, unsigned long npages, int do_free);
+int copyout(pagetable_t pagetable, unsigned long dstva, const char *src, unsigned long len);
+int copy_pagetable(pagetable_t old, pagetable_t new, unsigned long sz);
 
 // trap.c
 typedef void (*interrupt_handler_t)(void);
@@ -115,6 +120,7 @@ void handle_instruction_page_fault(struct tframe *tf);
 void handle_load_page_fault(struct tframe *tf);
 void handle_store_page_fault(struct tframe *tf);
 void handle_exception(struct tframe *tf);
+void prepare_return(void);
 
 // sbi.c
 void sbi_set_timer(unsigned long time);
@@ -139,6 +145,44 @@ struct context {
     unsigned long s10;
     unsigned long s11;
 };
+struct trapframe {
+  /*   0 */ unsigned long kernel_satp;
+  /*   8 */ unsigned long kernel_sp;
+  /*  16 */ unsigned long kernel_trap;
+  /*  24 */ unsigned long epc;
+  /*  32 */ unsigned long kernel_hartid;
+  /*  40 */ unsigned long ra;
+  /*  48 */ unsigned long sp;
+  /*  56 */ unsigned long gp;
+  /*  64 */ unsigned long tp;
+  /*  72 */ unsigned long t0;
+  /*  80 */ unsigned long t1;
+  /*  88 */ unsigned long t2;
+  /*  96 */ unsigned long s0;
+  /* 104 */ unsigned long s1;
+  /* 112 */ unsigned long a0;
+  /* 120 */ unsigned long a1;
+  /* 128 */ unsigned long a2;
+  /* 136 */ unsigned long a3;
+  /* 144 */ unsigned long a4;
+  /* 152 */ unsigned long a5;
+  /* 160 */ unsigned long a6;
+  /* 168 */ unsigned long a7;
+  /* 176 */ unsigned long s2;
+  /* 184 */ unsigned long s3;
+  /* 192 */ unsigned long s4;
+  /* 200 */ unsigned long s5;
+  /* 208 */ unsigned long s6;
+  /* 216 */ unsigned long s7;
+  /* 224 */ unsigned long s8;
+  /* 232 */ unsigned long s9;
+  /* 240 */ unsigned long s10;
+  /* 248 */ unsigned long s11;
+  /* 256 */ unsigned long t3;
+  /* 264 */ unsigned long t4;
+  /* 272 */ unsigned long t5;
+  /* 280 */ unsigned long t6;
+};
 struct proc {
     struct spinlock lock;
     int pid;
@@ -150,6 +194,10 @@ struct proc {
     void *chan;
     struct file *ofile[NOFILE];
     struct inode *cwd;
+    struct proc *parent;
+    unsigned long sz;
+    pagetable_t pagetable;
+    struct trapframe *trapframe;
 };
 extern struct proc proc_table[NPROC];
 extern struct proc *current_proc;
@@ -158,13 +206,15 @@ struct proc* alloc_process(void);
 void free_process(struct proc *p);
 int create_process(void (*entry)(void));
 void exit_process(struct proc *p, int status);
-int wait_process(int *status);
+int wait_process(unsigned long addr);
 void set_proc_priority(int pid, int pri);
 void scheduler_priority(void);
 void scheduler_rotate(void);
 void yield(void);
 void sleep(void *chan, struct spinlock *lk);
 void wakeup(void *chan);
+int fork_process(void);
+void forkret(void);
 
 // swtest.c
 void producer_task(void);
@@ -317,5 +367,5 @@ int snprintf(char *str, unsigned int size, const char *format, ...);
 // sysproc.c
 unsigned long sys_exit(int status);
 unsigned long sys_getpid(void);
-// unsigned long sys_fork(void);
-unsigned long sys_wait(int *status);
+unsigned long sys_fork(void);
+unsigned long sys_wait(unsigned long addr);

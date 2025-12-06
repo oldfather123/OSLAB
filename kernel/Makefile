@@ -16,7 +16,7 @@ CFLAGS = -Wall -O2 -ffreestanding -nostdlib -nostartfiles -mcmodel=medany
 LDFLAGS = -T kernel.ld
 
 # 目标文件
-OBJS = entry.o uart.o console.o printf.o spinlock.o kalloc.o string.o vm.o trap.o kernelvec.o sbi.o proc.o swtch.o swtest.o bio.o file.o fs.o sleeplock.o sysfile.o virtio_disk.o log.o snprintf.o sysproc.o start.o
+OBJS = entry.o uart.o console.o printf.o spinlock.o kalloc.o string.o vm.o trap.o kernelvec.o sbi.o proc.o swtch.o swtest.o bio.o file.o fs.o sleeplock.o sysfile.o virtio_disk.o log.o snprintf.o sysproc.o trampoline.o usys.o start.o
 
 # 最终生成的内核文件
 KERNEL = kernel.elf
@@ -33,6 +33,15 @@ kernelvec.o: kernelvec.S
 
 swtch.o: swtch.S
 	$(CC) $(CFLAGS) -c $< -o $@
+
+trampoline.o: trampoline.S
+	$(CC) $(CFLAGS) -c $< -o $@
+
+usys.S : usys.pl
+	perl usys.pl > usys.S
+
+usys.o : usys.S
+	$(CC) $(CFLAGS) -c -o usys.o usys.S
 
 # 编译 C 文件
 %.o: %.c
@@ -51,8 +60,8 @@ fs.img: $(MKFS)
 	./$(MKFS) fs.img
 
 # 运行内核
-run: $(KERNEL) fs.img
+run: $(KERNEL) fs.img usys.o
 	$(QEMU) -machine virt -nographic -bios default -kernel $(KERNEL) -global virtio-mmio.force-legacy=false -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
 # 清理生成的文件
 clean:
-	rm -f $(OBJS) $(KERNEL) fs.img
+	rm -f $(OBJS) $(KERNEL) fs.img usys.S usys.o

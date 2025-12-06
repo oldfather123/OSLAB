@@ -1,7 +1,10 @@
 #include "riscv.h"
 #include "def.h"
+#include "syscall.h"
 
 #define MAX_INTERRUPTS 128  // 最大支持的中断数
+
+extern char trampoline[], uservec[];
 
 // 中断向量表
 interrupt_handler_t interrupt_vector[MAX_INTERRUPTS];
@@ -30,6 +33,75 @@ void trap_init(void) {
     }
 
     plic_init();
+}
+
+unsigned long usertrap(void) {
+    if ((r_sstatus() & SSTATUS_SPP) != 0)
+        panic("usertrap: not from user mode");
+
+    w_stvec((unsigned long)kernelvec);
+
+    struct proc *p = current_proc;
+    p->trapframe->epc = r_sepc();
+
+    unsigned long sc = r_scause();
+    if (sc == 8) {
+        p->trapframe->epc += 4;
+        intr_on();
+
+        // 读取syscall号与参数
+        unsigned long num = p->trapframe->a7;
+        unsigned long a0 = p->trapframe->a0;
+        unsigned long a1 = p->trapframe->a1;
+        unsigned long a2 = p->trapframe->a2;
+
+        // 直接调用syscall并写回返回值到 a0
+        switch (num) {
+        case SYS_exit:
+            p->trapframe->a0 = sys_exit((int)a0);
+            break;
+        case SYS_getpid:
+            p->trapframe->a0 = sys_getpid();
+            break;
+        case SYS_fork:
+            p->trapframe->a0 = sys_fork();
+            break;
+        case SYS_wait:
+            p->trapframe->a0 = sys_wait(a0);
+            break;
+        default:
+            p->trapframe->a0 = -1;
+            break;
+        }
+    }
+    else {
+        printf("usertrap(): unexpected scause 0x%lx pid=%d\n", sc, p->pid);
+        printf("            sepc=0x%lx stval=0x%lx\n", r_sepc(), r_stval());
+    }
+
+    prepare_return();
+    return MAKE_SATP(p->pagetable);
+}
+
+void prepare_return(void) {
+    struct proc *p = current_proc;
+
+    intr_off();
+
+    unsigned long trampoline_uservec = TRAMPOLINE + (uservec - trampoline);
+    w_stvec(trampoline_uservec);
+
+    p->trapframe->kernel_satp = r_satp();
+    p->trapframe->kernel_sp = p->kstack + PGSIZE;
+    p->trapframe->kernel_trap = (unsigned long)usertrap;
+    p->trapframe->kernel_hartid = r_tp();
+
+    unsigned long x = r_sstatus();
+    x &= ~SSTATUS_SPP;
+    x |= SSTATUS_SPIE;
+    w_sstatus(x);
+
+    w_sepc(p->trapframe->epc);
 }
 
 void kerneltrap(void) {

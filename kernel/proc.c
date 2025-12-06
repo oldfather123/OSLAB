@@ -1,5 +1,8 @@
 #include "def.h"
 #include "riscv.h"
+#include "memlayout.h"
+
+extern char trampoline[];
 
 struct spinlock wait_lock;
 struct spinlock pid_lock;
@@ -19,6 +22,18 @@ int alloc_pid(void) {
     return pid;
 }
 
+void proc_mapstacks(pagetable_t kpgtbl) {
+    struct proc *p;
+  
+    for(p = proc_table; p < &proc_table[NPROC]; p++) {
+        char *pa = alloc_page();
+        if(pa == 0)
+            panic("kalloc");
+        unsigned long va = KSTACK((int) (p - proc_table));
+        map_region(kpgtbl, va, (unsigned long)pa, PGSIZE, PTE_R | PTE_W);
+    }
+}
+
 void proc_init(void) {
     // 初始化pid锁和wait锁
     initlock(&pid_lock, "pid_lock");
@@ -29,9 +44,41 @@ void proc_init(void) {
         // 初始化进程表项
         initlock(&p->lock, "proc");
         p->state = UNUSED;
-        p->kstack = 0;
+        p->kstack = KSTACK((int) (p - proc_table));
         p->priority = 0;
     }
+}
+
+pagetable_t proc_pagetable(struct proc *p) {
+    pagetable_t pagetable;
+
+    // 创建新的页表
+    pagetable = create_pagetable();
+    if (pagetable == 0)
+        return 0;
+
+    // 映射trampoline段代码
+    if (map_page(pagetable, TRAMPOLINE, (unsigned long)trampoline,
+                    PGSIZE, PTE_R | PTE_X) < 0) {
+        destroy_pagetable(pagetable);
+        return 0;
+    }
+
+    // 映射trapframe页面
+    if (map_page(pagetable, TRAPFRAME, (unsigned long)(p->trapframe), 
+                    PGSIZE,PTE_R | PTE_W) < 0){
+        unmap_page(pagetable, TRAMPOLINE, 1, 0);
+        destroy_pagetable(pagetable);
+        return 0;
+    }
+
+    return pagetable;
+}
+
+void proc_freepagetable(pagetable_t pagetable, unsigned long sz) {
+  unmap_page(pagetable, TRAMPOLINE, 1, 0);
+  unmap_page(pagetable, TRAPFRAME, 1, 0);
+  destroy_pagetable(pagetable);
 }
 
 struct proc* alloc_process(void) {
@@ -44,22 +91,31 @@ struct proc* alloc_process(void) {
             p->state = USED;
             p->pid = alloc_pid();
 
-            p->kstack = alloc_page();
-            if (!p->kstack) {
-                // 无法分配内核栈，释放资源并返回
-                p->state = UNUSED;
-                p->pid = 0;
+            // 分配trapframe页面
+            if ((p->trapframe = (struct trapframe *)alloc_page()) == 0) {
+                free_process(p);
                 release(&p->lock);
                 return 0;
             }
 
+            // 创建进程页表
+            p->pagetable = proc_pagetable(p);
+            if (p->pagetable == 0) {
+                free_process(p);
+                release(&p->lock);
+                return 0;
+            }
+            
             // 设置上下文
-            unsigned long sp = (unsigned long)p->kstack + PGSIZE;
-            p->context.sp = sp;
-            p->context.ra = 0;
+            memset(&p->context, 0, sizeof(p->context));
+            p->context.ra = (unsigned long)forkret;
+            // p->context.ra = 0;
+            p->context.sp = p->kstack + PGSIZE;
 
             // 设置当前目录
             p->cwd = namei("/");
+
+            p->parent = 0;
 
             // 返回时保持p->lock
             return p; 
@@ -72,13 +128,19 @@ struct proc* alloc_process(void) {
 }
 
 void free_process(struct proc *p) {
-    if (p->kstack) {
-        free_page(p->kstack);
-        p->kstack = 0;
-    }
-    p->state = UNUSED;
+    if (p->trapframe)
+        free_page((void *)p->trapframe);
+    p->trapframe = 0;
+    if (p->pagetable)
+        proc_freepagetable(p->pagetable, p->sz);
+    p->pagetable = 0;
+    p->sz = 0;
     p->pid = 0;
     p->priority = 0;
+    p->parent = 0;
+    p->chan = 0;
+    p->xstate = 0;
+    p->state = UNUSED;
 }
 
 int create_process(void (*entry)(void)) {
@@ -97,11 +159,6 @@ int create_process(void (*entry)(void)) {
 }
 
 void exit_process(struct proc *p, int status) {
-    acquire(&p->lock);
-    p->xstate = status;
-    p->state = ZOMBIE;
-    release(&p->lock);
-
     if (current_proc == p)
         current_proc = 0;
 
@@ -120,43 +177,59 @@ void exit_process(struct proc *p, int status) {
     end_op();
     p->cwd = 0;
 
-    // 唤醒队列中的所有进程
-    wakeup((void*)p);
+    if(p->parent) { 
+        acquire(&wait_lock);
+        wakeup(p->parent);
+        release(&wait_lock);
+    }
+
+    acquire(&p->lock);
+    p->xstate = status;
+    p->state = ZOMBIE;
+    release(&p->lock);
 
     // 切换回调度器
     swtch(&p->context, &sched_ctx);
 }
 
-int wait_process(int *status) {
+int wait_process(unsigned long addr) {
+    struct proc *pp;
+    int havekids, pid;
+    struct proc *p = current_proc;
+
+    acquire(&wait_lock);
+
     for (;;) {
+        havekids = 0;
         for (int i = 0; i < NPROC; i++) {
-            struct proc *p = &proc_table[i];
-            acquire(&p->lock);
+            pp = &proc_table[i];
+            if (pp->parent == p) {
+                acquire(&pp->lock);
 
-            // 找到一个可回收的进程
-            if (p->state == RUNNABLE || p->state == ZOMBIE) {
-                int pid = p->pid;
-                if (status) {
-                    // 获取退出状态
-                    *status = p->xstate;
+                havekids = 1;
+                if (pp->state == ZOMBIE || pp->state == RUNNABLE) {
+                    pid = pp->pid;
+                    if (addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
+                                             sizeof(pp->xstate)) < 0) {
+                        release(&pp->lock);
+                        release(&wait_lock);
+                        return -1;
+                    }
+                    free_process(pp);
+                    release(&pp->lock);
+                    release(&wait_lock);
+                    return pid;
                 }
-                // 直接释放进程资源
-                free_process(p); 
-                release(&p->lock);
-            
-                // 返回进程pid
-                return pid;
+                release(&pp->lock);
             }
-
-            release(&p->lock);
         }
-        
-        // 当前没有正在运行的进程，无法睡眠
-        if (!current_proc)
-            return -1;
 
-        // 没有可以回收的进程，睡眠等待
-        sleep((void*)0xDEADBEEF, &wait_lock);
+        if (!havekids) {
+            release(&wait_lock);
+            return -1;
+        }
+
+        sleep(p, &wait_lock);
     }
 }
 
@@ -314,4 +387,60 @@ void wakeup(void *chan) {
             p->state = RUNNABLE;
         release(&p->lock);
     }
+}
+
+int fork_process(void) {
+    int i, pid;
+    struct proc *np;
+    struct proc *p = current_proc;
+
+    // 分配新的进程
+    if ((np = alloc_process()) == 0)
+        return -1;
+
+    // 将父进程页表复制到子进程
+    if (copy_pagetable(p->pagetable, np->pagetable, p->sz) < 0) {
+        free_process(np);
+        release(&np->lock);
+        return -1;
+    }
+    np->sz = p->sz;
+
+    // 复制保存的用户寄存器状态
+    *(np->trapframe) = *(p->trapframe);
+
+    // 子进程返回0
+    np->trapframe->a0 = 0;
+
+    // 增加文件引用计数
+    for (i = 0; i < NOFILE; i++)
+        if (p->ofile[i])
+            np->ofile[i] = filedup(p->ofile[i]);
+    np->cwd = idup(p->cwd);
+
+    pid = np->pid;
+
+    release(&np->lock);
+
+    acquire(&wait_lock);
+    np->parent = p;
+    release(&wait_lock);
+
+    acquire(&np->lock);
+    np->state = RUNNABLE;
+    release(&np->lock);
+
+    return pid;
+}
+
+void forkret(void) {
+    extern char userret[];
+    struct proc *p = current_proc;
+
+    release(&p->lock);
+
+    prepare_return();
+    unsigned long satp = MAKE_SATP(p->pagetable);
+    unsigned long trampoline_userret = TRAMPOLINE + (userret - trampoline);
+    ((void (*)(unsigned long))trampoline_userret)(satp);
 }

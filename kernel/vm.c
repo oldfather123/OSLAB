@@ -2,6 +2,7 @@
 #include "def.h"
 
 extern char etext[]; 
+extern char trampoline[];
 
 pagetable_t create_pagetable(void) {
     pagetable_t pt = (pagetable_t)alloc_page();
@@ -110,6 +111,12 @@ void kvm_init(void) {
 
     // 映射PLIC
     map_region(kernel_pagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+
+    // 映射trampoline代码段
+    map_region(kernel_pagetable, TRAMPOLINE, (unsigned long)trampoline, PGSIZE, PTE_R | PTE_X);
+
+    // 映射内核栈
+    proc_mapstacks(kernel_pagetable);
 } 
  
 
@@ -123,4 +130,84 @@ void map_region(pagetable_t kpgtbl, unsigned long va, unsigned long pa, unsigned
     // 建立映射
     if(map_page(kpgtbl, va, pa, sz, perm) != 0)
         panic("kvmmap");
+}
+
+void unmap_page(pagetable_t pagetable, unsigned long va, unsigned long npages, int do_free) {
+    unsigned long a;
+    pte_t *pte;
+
+    if ((va % PGSIZE) != 0)
+        panic("uvmunmap: not aligned");
+
+    for (a = va; a < va + npages * PGSIZE; a += PGSIZE) {
+        if ((pte = walk_create(pagetable, a)) == 0)
+            continue;
+        if ((*pte & PTE_V) == 0)
+            continue;
+        if (do_free) {
+            unsigned long pa = PTE2PA(*pte);
+            free_page((void *)pa);
+        }
+        *pte = 0;
+    }
+}
+
+int copyout(pagetable_t pagetable, unsigned long dstva, const char *src, unsigned long len) {
+    unsigned long va0, pa0, n;
+    pte_t *pte;
+
+    while (len > 0) {
+        va0 = PGROUNDDOWN(dstva);
+
+        // 查找页表项
+        pte = walk_lookup(pagetable, va0);
+        if (pte == 0)
+            return -1;
+
+        // 必须是有效用户页
+        if (((*pte & PTE_V) == 0) || ((*pte & PTE_U) == 0))
+            return -1;
+
+        pa0 = PTE2PA(*pte);
+
+        // 本页可拷贝的字节数
+        n = PGSIZE - (dstva - va0);
+        if (n > len)
+            n = len;
+
+        // 物理地址拷贝
+        memmove((void *)(pa0 + (dstva - va0)), (const void *)src, n);
+
+        len -= n;
+        src += n;
+        dstva = va0 + PGSIZE;
+    }
+    return 0;
+}
+
+int copy_pagetable(pagetable_t old, pagetable_t new, unsigned long sz) {
+    pte_t *pte;
+    unsigned long pa, i;
+    unsigned int flags;
+    char *mem;
+
+    for (i = 0; i < sz; i += PGSIZE) {
+        if ((pte = walk_create(old, i)) == 0)
+            continue;
+        if ((*pte & PTE_V) == 0)
+            continue;
+        pa = PTE2PA(*pte);
+        flags = PTE_FLAGS(*pte);
+        if ((mem = alloc_page()) == 0) {
+            unmap_page(new, 0, i / PGSIZE, 1);
+            return -1;
+        }
+        memmove(mem, (char *)pa, PGSIZE);
+        if (map_page(new, i, PGSIZE, (unsigned long)mem, flags) != 0) {
+            free_page(mem);
+            unmap_page(new, 0, i / PGSIZE, 1);
+            return -1;
+        }
+    }
+    return 0; 
 }

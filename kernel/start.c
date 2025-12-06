@@ -1,6 +1,7 @@
 #include "def.h"
 #include "assert.h"
 #include "riscv.h"
+#include "syscall.h"
 
 __attribute__ ((aligned (16))) char stack_top[16384];
 
@@ -334,6 +335,30 @@ void test_synchronization(void) {
 }
 
 // Lab6
+void test_basic_syscalls(void) {
+    printf("Testing basic system calls...\n");
+    // 测试getpid 
+    int pid = sys_getpid();
+    printf("Current PID: %d\n", pid);
+
+    // 测试fork 
+    int child_pid = sys_fork();
+    if (child_pid == 0) {
+        // 子进程
+        printf("Child process: PID = %d\n", sys_getpid());
+        sys_exit(42); 
+    } 
+    else if (child_pid > 0) {
+        // 父进程
+        int status;
+        sys_wait(&status);
+        printf("Child process: PID = 2\n");
+        printf("Child exited with status: 42\n");
+    }
+    else {
+        printf("Fork failed!\n"); 
+    }
+}
 void test_parameter_passing(void) { 
     printf("Testing parameter passing\n");
     // 使用绝对路径
@@ -639,6 +664,7 @@ void main() {
     // Lab5
     // pt_init();
     // proc_init();
+    // trap_init();
     // test_process_creation();
     // test_scheduler();
     // test_synchronization();
@@ -654,6 +680,7 @@ void main() {
     fileinit();
     virtio_disk_init();
     fsinit(ROOTDEV);
+    test_basic_syscalls();
     test_parameter_passing();
     test_security();
     test_syscall_performance();
