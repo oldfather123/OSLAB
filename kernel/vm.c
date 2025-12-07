@@ -119,7 +119,6 @@ void kvm_init(void) {
     proc_mapstacks(kernel_pagetable);
 } 
  
-
 void kvm_inithart(void) { 
     // 激活内核页表
     w_satp(MAKE_SATP(kernel_pagetable)); 

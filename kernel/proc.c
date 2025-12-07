@@ -76,9 +76,9 @@ pagetable_t proc_pagetable(struct proc *p) {
 }
 
 void proc_freepagetable(pagetable_t pagetable, unsigned long sz) {
-  unmap_page(pagetable, TRAMPOLINE, 1, 0);
-  unmap_page(pagetable, TRAPFRAME, 1, 0);
-  destroy_pagetable(pagetable);
+    unmap_page(pagetable, TRAMPOLINE, 1, 0);
+    unmap_page(pagetable, TRAPFRAME, 1, 0);
+    destroy_pagetable(pagetable);
 }
 
 struct proc* alloc_process(void) {
