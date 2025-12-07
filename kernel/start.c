@@ -430,6 +430,7 @@ void test_security(void) {
     printf("Security test completed\n");
 }
 void test_syscall_performance(void) { 
+    printf("Testing syscall performance\n");
     unsigned long start_time = get_time(); 
 
     // 大量系统调用测试
@@ -439,6 +440,7 @@ void test_syscall_performance(void) {
 
     unsigned long end_time = get_time(); 
     printf("10000 getpid() calls took %d cycles\n", end_time - start_time); 
+    printf("Syscall performance test completed\n");
 }
 
 // Lab7
@@ -731,20 +733,20 @@ void main() {
     // test_synchronization();
 
     // Lab6
-    // pt_init();
-    // proc_init();
-    // current_proc = alloc_process();
-    // release(&current_proc->lock);
-    // trap_init();
-    // iinit();
-    // binit();
-    // fileinit();
-    // virtio_disk_init();
-    // fsinit(ROOTDEV);
-    // test_basic_syscalls();
-    // test_parameter_passing();
-    // test_security();
-    // test_syscall_performance();
+    pt_init();
+    proc_init();
+    current_proc = alloc_process();
+    release(&current_proc->lock);
+    trap_init();
+    iinit();
+    binit();
+    fileinit();
+    virtio_disk_init();
+    fsinit(ROOTDEV);
+    test_basic_syscalls();
+    test_parameter_passing();
+    test_security();
+    test_syscall_performance();
 
     // Lab7
     // pt_init();
@@ -765,9 +767,9 @@ void main() {
     // test_crash_recovery();
 
     // Lab8
-    pt_init();
-    proc_init();
-    test_scheduler_1();
-    test_scheduler_2();
-    test_scheduler_3();
+    // pt_init();
+    // proc_init();
+    // test_scheduler_1();
+    // test_scheduler_2();
+    // test_scheduler_3();
 }
