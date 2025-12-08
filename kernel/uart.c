@@ -10,13 +10,13 @@
 
 void uart_putc(char c) {
     // 等待发送缓冲区空
-    while((ReadReg(LSR) & LSR_TX_IDLE) == 0);
+    while ((ReadReg(LSR) & LSR_TX_IDLE) == 0);
     // 写入字符到发送寄存器
     WriteReg(THR, c);
 }
 
 void uart_puts(char *s) {
-    while(*s) {
+    while (*s) {
         uart_putc(*s++);
     }
 }

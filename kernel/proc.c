@@ -25,9 +25,9 @@ int alloc_pid(void) {
 void proc_mapstacks(pagetable_t kpgtbl) {
     struct proc *p;
   
-    for(p = proc_table; p < &proc_table[NPROC]; p++) {
+    for (p = proc_table; p < &proc_table[NPROC]; p++) {
         char *pa = alloc_page();
-        if(pa == 0)
+        if (pa == 0)
             panic("kalloc");
         unsigned long va = KSTACK((int) (p - proc_table));
         map_region(kpgtbl, va, (unsigned long)pa, PGSIZE, PTE_R | PTE_W);
@@ -165,8 +165,8 @@ void exit_process(struct proc *p, int status) {
         current_proc = 0;
 
     // 关闭进程打开的文件
-    for(int fd = 0; fd < NOFILE; fd++) {
-        if(p->ofile[fd]) {
+    for (int fd = 0; fd < NOFILE; fd++) {
+        if (p->ofile[fd]) {
             struct file *f = p->ofile[fd];
             fileclose(f);
             p->ofile[fd] = 0;
@@ -179,7 +179,7 @@ void exit_process(struct proc *p, int status) {
     end_op();
     p->cwd = 0;
 
-    if(p->parent) { 
+    if (p->parent) { 
         acquire(&wait_lock);
         wakeup(p->parent);
         release(&wait_lock);
@@ -243,6 +243,19 @@ void set_proc_priority(int pid, int pri) {
             p->priority = pri;
             release(&p->lock);
             return;
+        }
+        release(&p->lock);
+    }
+}
+
+int get_proc_priority(int pid) {
+    for (int i = 0; i < NPROC; i++) {
+        struct proc *p = &proc_table[i];
+        acquire(&p->lock);
+        if (p->pid == pid) {
+            int pri = p->priority ;
+            release(&p->lock);
+            return pri;
         }
         release(&p->lock);
     }

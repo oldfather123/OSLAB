@@ -209,6 +209,7 @@ int create_process(void (*entry)(void));
 void exit_process(struct proc *p, int status);
 int wait_process(unsigned long addr);
 void set_proc_priority(int pid, int pri);
+int get_proc_priority(int pid);
 void scheduler_priority(void);
 void scheduler_rotate(void);
 void yield(void);

@@ -656,7 +656,7 @@ void test_scheduler_1(void) {
     // 设置高低优先级
     set_proc_priority(pid_high, 50);
     set_proc_priority(pid_med, 10);
-    printf("Set process priorities, HIGH = 50, MED = 10\n");
+    printf("Set process priorities, HIGH = %d, MED = %d\n", get_proc_priority(pid_high), get_proc_priority(pid_med));
 
     // 启动调度器
     scheduler_priority_extend(0);
@@ -676,7 +676,7 @@ void test_scheduler_2(void) {
     // 设置相等优先级
     set_proc_priority(pid_high, 50);
     set_proc_priority(pid_med, 50);
-    printf("Set process priorities, HIGH = 50, MED = 50\n");
+    printf("Set process priorities, HIGH = %d, MED = %d\n", get_proc_priority(pid_high), get_proc_priority(pid_med));
 
     // 启动调度器
     scheduler_priority_extend(0);
@@ -696,80 +696,103 @@ void test_scheduler_3(void) {
     // 设置近似优先级
     set_proc_priority(pid_high, 50);
     set_proc_priority(pid_med, 49);
-    printf("Set process priorities, HIGH = 50, MED = 49\n");
+    printf("Set process priorities, HIGH = %d, MED = %d\n", get_proc_priority(pid_high), get_proc_priority(pid_med));
 
     // 启动调度器，启用老化机制
     scheduler_priority_extend(1);
     printf("Scheduler test 3 completed\n");
 }
 
-void main() {
+void test_lab(int lab) {
+    switch (lab) {
+
     // Lab1
-    // uart_puts("Hello OS");
+    case 1:
+        uart_puts("Hello OS");
+        break;
 
     // Lab2
-    // test_printf_basic();
-    // test_printf_edge_cases();
-    // clear_screen();
+    case 2:
+        test_printf_basic();
+        test_printf_edge_cases();
+        clear_screen();
+        break;
 
     // Lab3
-    // pmm_init();
-    // test_alloc_pages();
-    // test_physical_memory();
-    // test_pagetable();
-    // test_virtual_memory();
+    case 3:
+        pmm_init();
+        test_alloc_pages();
+        test_physical_memory();
+        test_pagetable();
+        test_virtual_memory();
+        break;
 
     // Lab4
-    // pt_init();
-    // trap_init();
-    // test_timer_interrupt();
-    // test_exception_handling();
+    case 4:
+        pt_init();
+        trap_init();
+        test_timer_interrupt();
+        test_exception_handling();
+        break;
 
     // Lab5
-    // pt_init();
-    // proc_init();
-    // test_process_creation();
-    // test_scheduler();
-    // test_synchronization();
+    case 5:
+        pt_init();
+        proc_init();
+        test_process_creation();
+        test_scheduler();
+        test_synchronization();
+        break;
 
     // Lab6
-    pt_init();
-    proc_init();
-    current_proc = alloc_process();
-    release(&current_proc->lock);
-    trap_init();
-    iinit();
-    binit();
-    fileinit();
-    virtio_disk_init();
-    fsinit(ROOTDEV);
-    test_basic_syscalls();
-    test_parameter_passing();
-    test_security();
-    test_syscall_performance();
+    case 6:
+        pt_init();
+        proc_init();
+        current_proc = alloc_process();
+        release(&current_proc->lock);
+        trap_init();
+        iinit();
+        binit();
+        fileinit();
+        virtio_disk_init();
+        fsinit(ROOTDEV);
+        test_basic_syscalls();
+        test_parameter_passing();
+        test_security();
+        test_syscall_performance();
+        break;
 
     // Lab7
-    // pt_init();
-    // proc_init();
-    // current_proc = alloc_process();
-    // release(&current_proc->lock);
-    // trap_init();
-    // iinit();
-    // binit();
-    // fileinit();
-    // virtio_disk_init();
-    // fsinit(ROOTDEV);
-    // test_filesystem_integrity();
-    // test_concurrent_file_access();
-    // current_proc = alloc_process();
-    // release(&current_proc->lock);
-    // test_filesystem_performance();
-    // test_crash_recovery();
+    case 7:
+        pt_init();
+        proc_init();
+        current_proc = alloc_process();
+        release(&current_proc->lock);
+        trap_init();
+        iinit();
+        binit();
+        fileinit();
+        virtio_disk_init();
+        fsinit(ROOTDEV);
+        test_filesystem_integrity();
+        test_concurrent_file_access();
+        current_proc = alloc_process();
+        release(&current_proc->lock);
+        test_filesystem_performance();
+        test_crash_recovery();
+        break;
 
     // Lab8
-    // pt_init();
-    // proc_init();
-    // test_scheduler_1();
-    // test_scheduler_2();
-    // test_scheduler_3();
+    case 8:
+        pt_init();
+        proc_init();
+        test_scheduler_1();
+        test_scheduler_2();
+        test_scheduler_3();
+        break;
+    }
+}
+
+void main() {
+    test_lab(8);
 }

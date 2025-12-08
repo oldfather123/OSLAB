@@ -12,30 +12,30 @@ pagetable_t create_pagetable(void) {
 }
 
 int map_page(pagetable_t pt, unsigned long va, unsigned long pa, unsigned long size, int perm) {
-    if((va % PGSIZE) != 0)
+    if ((va % PGSIZE) != 0)
         panic("mappages: va not aligned");
 
-    if((pa % PGSIZE) != 0)
+    if ((pa % PGSIZE) != 0)
         panic("mappages: pa not aligned");
 
-    if((size % PGSIZE) != 0)
+    if ((size % PGSIZE) != 0)
         panic("mappages: size not aligned");
     
     pte_t *pte;
     unsigned long a = va;
     unsigned long last = va + size - PGSIZE;
-    for(;;){
-        if((pte = walk_create(pt, a)) == 0)
+    for (;;){
+        if ((pte = walk_create(pt, a)) == 0)
             // 创建中间级页表失败    
             return -1;
-        if(*pte & PTE_V)
+        if (*pte & PTE_V)
             // 页表项已存在
             panic("mappages: remap");
 
         // 更新页表项
         *pte = PA2PTE(pa) | perm | PTE_V;
         
-        if(a == last)
+        if (a == last)
             break;
         a += PGSIZE;
         pa += PGSIZE;
@@ -127,7 +127,7 @@ void kvm_inithart(void) {
 
 void map_region(pagetable_t kpgtbl, unsigned long va, unsigned long pa, unsigned long sz, int perm) {
     // 建立映射
-    if(map_page(kpgtbl, va, pa, sz, perm) != 0)
+    if (map_page(kpgtbl, va, pa, sz, perm) != 0)
         panic("kvmmap");
 }
 
